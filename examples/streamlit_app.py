@@ -29,6 +29,8 @@ def init_glcs():
         st.session_state.memory = SimpleMemory(persist_path="streamlit_memory.json")
         st.session_state.checker = ConsistencyChecker(st.session_state.memory)
         st.session_state.history = []
+        st.session_state.last_checked_stmt = None
+        st.session_state.show_store_success = False
 
 
 def main():
@@ -63,6 +65,7 @@ def main():
         if st.button("🗑️ Clear Memory", use_container_width=True):
             st.session_state.memory.clear()
             st.session_state.history = []
+            st.session_state.last_checked_stmt = None
             st.rerun()
 
         if st.button("✅ Verify Knowledge Base", use_container_width=True):
@@ -81,15 +84,18 @@ def main():
     with tab1:
         st.header("Enter a Statement")
 
+        # Show success message if we just stored something
+        if st.session_state.show_store_success:
+            st.success("✅ Statement stored successfully!")
+            st.session_state.show_store_success = False
+
         statement = st.text_input(
             "Type a logical statement:",
-            placeholder="e.g., 'All birds can fly' or 'John is a manager'"
+            placeholder="e.g., 'All birds can fly' or 'John is a manager'",
+            key="statement_input"
         )
 
-        col1, col2 = st.columns([1, 4])
-
-        with col1:
-            check_button = st.button("Check Statement", type="primary", use_container_width=True)
+        check_button = st.button("Check Statement", type="primary", use_container_width=True)
 
         if check_button and statement:
             # Parse the statement
@@ -98,7 +104,14 @@ def main():
             if stmt is None:
                 st.warning("⚠️ Could not parse this statement into logical form.")
                 st.info("Try statements like: 'All X can Y', 'John is X', or 'If X then Y'")
+                st.session_state.last_checked_stmt = None
             else:
+                # Store in session state for the store button
+                st.session_state.last_checked_stmt = {
+                    'stmt': stmt,
+                    'text': statement
+                }
+
                 # Display parsed information
                 st.success(f"✓ Parsed as **{stmt.type.value}** statement")
 
@@ -126,16 +139,6 @@ def main():
                             for fact in supporting:
                                 st.write(f"- {fact.raw_text}")
 
-                    # Store the statement
-                    if st.button("💾 Store in Memory", use_container_width=True):
-                        st.session_state.memory.store(stmt)
-                        st.session_state.history.append({
-                            'statement': statement,
-                            'consistent': True,
-                            'violations': []
-                        })
-                        st.rerun()
-
                 else:
                     st.error(f"❌ Contradiction detected! (confidence: {confidence:.2%})")
 
@@ -148,12 +151,33 @@ def main():
                     if suggestion:
                         st.info(f"💡 **Suggestion:** {suggestion}")
 
-                    # Store history
+                    # Store history for inconsistent statements
                     st.session_state.history.append({
                         'statement': statement,
                         'consistent': False,
                         'violations': violations
                     })
+
+        # Store button - shown if there's a last checked statement that was consistent
+        if st.session_state.last_checked_stmt is not None:
+            stmt = st.session_state.last_checked_stmt['stmt']
+            is_consistent, _, _ = st.session_state.checker.check_consistency(stmt)
+
+            if is_consistent:
+                st.divider()
+                if st.button("💾 Store in Memory", key="store_button", use_container_width=True, type="primary"):
+                    success = st.session_state.memory.store(stmt)
+                    if success:
+                        st.session_state.history.append({
+                            'statement': st.session_state.last_checked_stmt['text'],
+                            'consistent': True,
+                            'violations': []
+                        })
+                        st.session_state.show_store_success = True
+                        st.session_state.last_checked_stmt = None
+                        st.rerun()
+                    else:
+                        st.error("❌ Could not store (may already exist or conflict with existing facts)")
 
         # Show recent history
         if st.session_state.history:
