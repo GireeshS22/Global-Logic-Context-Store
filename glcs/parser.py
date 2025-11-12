@@ -31,6 +31,9 @@ class SimpleParser:
                 r'if (?:a |an |the )?(\w+) .* then .* (\w+)',
                 r'when (?:a |an |the )?(\w+) .* (?:it |they |you )?(\w+)',
                 r'whenever (\w+) .* (\w+)',
+                # Enhanced patterns for natural language without "then"
+                r'if (?:it |the |a )?(\w+).*?(?:I will|I\'ll|you will|we will|will) (\w+)',
+                r'if .*?(\w+)s .*?(?:I will|I\'ll|will) (\w+)',  # Catches "rains" -> "take"
             ],
             'ground': [
                 r'(\w+) is (?:a |an |the )?(\w+)',
