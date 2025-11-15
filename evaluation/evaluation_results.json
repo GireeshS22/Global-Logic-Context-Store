@@ -1,0 +1,289 @@
+{
+  "total_cases": 17,
+  "total_correct": 10,
+  "overall_accuracy": 0.5882352941176471,
+  "overall_precision": 0.875,
+  "overall_recall": 0.6363636363636364,
+  "overall_f1": 0.7368421052631579,
+  "dataset_metrics": [
+    {
+      "dataset_name": "Job Role Contradictions",
+      "total_cases": 3,
+      "correct": 2,
+      "accuracy": 0.6666666666666666,
+      "true_positives": 2,
+      "false_positives": 1,
+      "true_negatives": 0,
+      "false_negatives": 0,
+      "parse_failures": 0,
+      "precision": 0.6666666666666666,
+      "recall": 1.0,
+      "f1_score": 0.8,
+      "results": [
+        {
+          "test_case_id": 1,
+          "category": "mutual_exclusivity",
+          "expected": "contradiction",
+          "actual": "contradiction",
+          "correct": true,
+          "confidence": 0.8,
+          "violations": 1,
+          "setup_success": true,
+          "note": ""
+        },
+        {
+          "test_case_id": 2,
+          "category": "mutual_exclusivity",
+          "expected": "contradiction",
+          "actual": "contradiction",
+          "correct": true,
+          "confidence": 0.8,
+          "violations": 1,
+          "setup_success": true,
+          "note": ""
+        },
+        {
+          "test_case_id": 3,
+          "category": "duplicate",
+          "expected": "consistent",
+          "actual": "contradiction",
+          "correct": false,
+          "confidence": 0.8,
+          "violations": 1,
+          "setup_success": true,
+          "note": ""
+        }
+      ]
+    },
+    {
+      "dataset_name": "Capability Contradictions",
+      "total_cases": 3,
+      "correct": 3,
+      "accuracy": 1.0,
+      "true_positives": 2,
+      "false_positives": 0,
+      "true_negatives": 1,
+      "false_negatives": 0,
+      "parse_failures": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "results": [
+        {
+          "test_case_id": 1,
+          "category": "direct_negation",
+          "expected": "contradiction",
+          "actual": "contradiction",
+          "correct": true,
+          "confidence": 0.8,
+          "violations": 1,
+          "setup_success": true,
+          "note": ""
+        },
+        {
+          "test_case_id": 2,
+          "category": "direct_negation",
+          "expected": "contradiction",
+          "actual": "contradiction",
+          "correct": true,
+          "confidence": 0.8,
+          "violations": 1,
+          "setup_success": true,
+          "note": ""
+        },
+        {
+          "test_case_id": 3,
+          "category": "independent_capabilities",
+          "expected": "consistent",
+          "actual": "consistent",
+          "correct": true,
+          "confidence": 0.95,
+          "violations": 0,
+          "setup_success": true,
+          "note": ""
+        }
+      ]
+    },
+    {
+      "dataset_name": "Universal Rule Violations",
+      "total_cases": 3,
+      "correct": 3,
+      "accuracy": 1.0,
+      "true_positives": 2,
+      "false_positives": 0,
+      "true_negatives": 1,
+      "false_negatives": 0,
+      "parse_failures": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "results": [
+        {
+          "test_case_id": 1,
+          "category": "universal_violation",
+          "expected": "contradiction",
+          "actual": "contradiction",
+          "correct": true,
+          "confidence": 0.6,
+          "violations": 2,
+          "setup_success": true,
+          "note": ""
+        },
+        {
+          "test_case_id": 2,
+          "category": "universal_violation",
+          "expected": "contradiction",
+          "actual": "contradiction",
+          "correct": true,
+          "confidence": 0.6,
+          "violations": 2,
+          "setup_success": true,
+          "note": ""
+        },
+        {
+          "test_case_id": 3,
+          "category": "universal_compliance",
+          "expected": "consistent",
+          "actual": "consistent",
+          "correct": true,
+          "confidence": 0.95,
+          "violations": 0,
+          "setup_success": true,
+          "note": ""
+        }
+      ]
+    },
+    {
+      "dataset_name": "Conditional Logic",
+      "total_cases": 2,
+      "correct": 0,
+      "accuracy": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "true_negatives": 0,
+      "false_negatives": 1,
+      "parse_failures": 1,
+      "precision": 0,
+      "recall": 0.0,
+      "f1_score": 0,
+      "results": [
+        {
+          "test_case_id": 1,
+          "category": "conditional_violation",
+          "expected": "contradiction",
+          "actual": "consistent",
+          "correct": false,
+          "confidence": 0.95,
+          "violations": 0,
+          "setup_success": true,
+          "note": ""
+        },
+        {
+          "test_case_id": 2,
+          "category": "conditional_antecedent",
+          "expected": "consistent",
+          "actual": "parse_failed",
+          "correct": false,
+          "setup_success": true,
+          "note": ""
+        }
+      ]
+    },
+    {
+      "dataset_name": "New Pattern Coverage",
+      "total_cases": 4,
+      "correct": 2,
+      "accuracy": 0.5,
+      "true_positives": 1,
+      "false_positives": 0,
+      "true_negatives": 1,
+      "false_negatives": 2,
+      "parse_failures": 0,
+      "precision": 1.0,
+      "recall": 0.3333333333333333,
+      "f1_score": 0.5,
+      "results": [
+        {
+          "test_case_id": 1,
+          "category": "universal_everyone",
+          "expected": "contradiction",
+          "actual": "consistent",
+          "correct": false,
+          "confidence": 0.95,
+          "violations": 0,
+          "setup_success": true,
+          "note": ""
+        },
+        {
+          "test_case_id": 2,
+          "category": "universal_nobody",
+          "expected": "contradiction",
+          "actual": "contradiction",
+          "correct": true,
+          "confidence": 0.6,
+          "violations": 2,
+          "setup_success": true,
+          "note": ""
+        },
+        {
+          "test_case_id": 3,
+          "category": "exclusive_permission",
+          "expected": "contradiction",
+          "actual": "consistent",
+          "correct": false,
+          "confidence": 0.95,
+          "violations": 0,
+          "setup_success": true,
+          "note": ""
+        },
+        {
+          "test_case_id": 4,
+          "category": "modal_verbs",
+          "expected": "consistent",
+          "actual": "consistent",
+          "correct": true,
+          "confidence": 0.95,
+          "violations": 0,
+          "setup_success": true,
+          "note": ""
+        }
+      ]
+    },
+    {
+      "dataset_name": "Complex Multi-Statement",
+      "total_cases": 2,
+      "correct": 0,
+      "accuracy": 0.0,
+      "true_positives": 0,
+      "false_positives": 0,
+      "true_negatives": 0,
+      "false_negatives": 1,
+      "parse_failures": 1,
+      "precision": 0,
+      "recall": 0.0,
+      "f1_score": 0,
+      "results": [
+        {
+          "test_case_id": 1,
+          "category": "multi_hop_reasoning",
+          "expected": "contradiction",
+          "actual": "consistent",
+          "correct": false,
+          "confidence": 0.95,
+          "violations": 0,
+          "setup_success": true,
+          "note": "Requires transitive reasoning - current limitation"
+        },
+        {
+          "test_case_id": 2,
+          "category": "transitive_relationships",
+          "expected": "contradiction",
+          "actual": "parse_failed",
+          "correct": false,
+          "setup_success": false,
+          "note": "Requires graph reasoning - current limitation"
+        }
+      ]
+    }
+  ]
+}
