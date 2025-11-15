@@ -21,25 +21,47 @@ class SimpleParser:
         # Patterns for different logical types
         self.patterns = {
             'universal': [
+                # Basic universal patterns
                 r'all (\w+) (?:are|have|can) (\w+)',
                 r'every (\w+) (?:is|has|can) (\w+)',
                 r'no (\w+) (?:are|have|can) (\w+)',  # Negative universal
                 r'(\w+) are always (\w+)',
                 r'(\w+) can never (\w+)',
+                # Enhanced universal patterns
+                r'everyone (?:is|has|can) (\w+)',           # "everyone is welcome"
+                r'nobody (?:is|has|can) (\w+)',             # "nobody is perfect"
+                r'nothing (?:is|can) (\w+)',                # "nothing is impossible"
+                r'everything (?:is|has) (\w+)',             # "everything is permitted"
+                r'none of (?:the )?(\w+) (?:are|can) (\w+)', # "none of the users can access"
+                r'only (\w+) (?:can|may) (\w+)',            # "only admins can delete"
             ],
             'conditional': [
+                # Basic conditional patterns
                 r'if (?:a |an |the )?(\w+) .* then .* (\w+)',
                 r'when (?:a |an |the )?(\w+) .* (?:it |they |you )?(\w+)',
                 r'whenever (\w+) .* (\w+)',
-                # Enhanced patterns for natural language without "then"
+                # Enhanced natural language patterns
                 r'if (?:it |the |a )?(\w+).*?(?:I will|I\'ll|you will|we will|will) (\w+)',
-                r'if .*?(\w+)s .*?(?:I will|I\'ll|will) (\w+)',  # Catches "rains" -> "take"
+                r'if .*?(\w+)s .*?(?:I will|I\'ll|will) (\w+)',
+                # New conditional patterns
+                r'unless (\w+) .* (\w+)',                   # "unless alarm rings wake"
+                r'either (\w+) or (\w+)',                   # "either succeed or fail"
+                r'neither (\w+) nor (\w+)',                 # "neither hot nor cold"
+                r'as long as (\w+) .* (\w+)',               # "as long as pays can stay"
             ],
             'ground': [
+                # Basic ground fact patterns
                 r'(\w+) is (?:a |an |the )?(\w+)',
                 r'(\w+) has (?:a |an |the )?(\w+)',
                 r'(\w+) can (\w+)',
                 r'(\w+) cannot (\w+)',
+                # Enhanced ground fact patterns
+                r'(\w+) does not (\w+)',                    # "John does not code"
+                r'(\w+) will (\w+)',                        # "Alice will attend"
+                r'(\w+) won\'t (\w+)',                      # "Bob won't participate"
+                r'(\w+) must (\w+)',                        # "Mary must approve"
+                r'(\w+) should (\w+)',                      # "Charlie should review"
+                r'(\w+) may (\w+)',                         # "Dave may join"
             ]
         }
 
@@ -58,12 +80,34 @@ class SimpleParser:
         for pattern in self.patterns['universal']:
             match = re.search(pattern, text_lower)
             if match:
-                subject = match.group(1)
-                predicate = match.group(2)
+                # Handle patterns with 1 or 2 capture groups
+                groups = match.groups()
+                if len(groups) == 1:
+                    # Patterns like "everyone is welcome" - only one capture group
+                    if text_lower.startswith('everyone'):
+                        subject = 'everyone'
+                        predicate = groups[0]
+                    elif text_lower.startswith('nobody'):
+                        subject = 'nobody'
+                        predicate = f"not_{groups[0]}"
+                    elif text_lower.startswith('nothing'):
+                        subject = 'nothing'
+                        predicate = f"not_{groups[0]}"
+                    elif text_lower.startswith('everything'):
+                        subject = 'everything'
+                        predicate = groups[0]
+                    else:
+                        subject = groups[0]
+                        predicate = 'exists'
+                else:
+                    # Normal patterns with 2 capture groups
+                    subject = groups[0]
+                    predicate = groups[1]
 
                 # Handle negation patterns
-                if text_lower.startswith('no ') or 'never' in text_lower:
-                    predicate = f"not_{predicate}"
+                if text_lower.startswith('no ') or 'never' in text_lower or text_lower.startswith('nobody'):
+                    if not predicate.startswith('not_'):
+                        predicate = f"not_{predicate}"
 
                 return LogicalStatement(
                     type=LogicalType.UNIVERSAL,
