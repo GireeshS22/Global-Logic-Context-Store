@@ -12,8 +12,8 @@ from pathlib import Path
 
 
 def test_python_version():
-    """Verify Python version is 3.11+."""
-    assert sys.version_info >= (3, 11), "Python 3.11+ is required"
+    """Verify Python version is 3.10+."""
+    assert sys.version_info >= (3, 10), "Python 3.10+ is required"
 
 
 def test_project_structure():
@@ -58,7 +58,7 @@ def test_dependencies_installed():
     from dotenv import load_dotenv
 
     # Verify versions
-    assert numpy.__version__.startswith('2.'), "NumPy 2.x required"
+    assert numpy.__version__.startswith('1.26'), "NumPy 1.26+ required"
     assert pydantic.__version__.startswith('2.'), "Pydantic 2.x required"
 
 

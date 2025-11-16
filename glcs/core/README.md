@@ -700,13 +700,671 @@ poetry run pytest tests/unit/test_semantic_encoder.py --cov=glcs.core.semantic_e
 
 ---
 
+## Memory Manager (Stage 1.2) ✅
+
+**File:** `glcs/core/memory_manager.py`
+
+### Purpose
+
+The **MemoryManager** provides persistent and in-memory storage for LogicalForm objects using ChromaDB as a vector database. It enables:
+- Storage and retrieval of LogicalForms with 768-dimensional embeddings
+- Semantic similarity search across stored forms
+- Context-based filtering and querying
+- Entity and relation-based search
+
+### Key Features
+
+- **Dual-mode storage:** In-memory (testing) and persistent (production)
+- **ChromaDB integration:** Efficient vector database with built-in similarity search
+- **Full CRUD operations:** Store, retrieve, update, delete LogicalForms
+- **Advanced queries:** Search by similarity, context, entity, relation
+- **Context management:** List contexts, clear contexts, get statistics
+
+### Core Methods
+
+#### Storage Operations
+
+**`store_form(form: LogicalForm) -> UUID`**
+
+Store a LogicalForm with its embedding in the vector database.
+
+```python
+from glcs.core.memory_manager import MemoryManager
+from glcs.core.semantic_encoder import SemanticEncoder
+
+memory = MemoryManager()
+encoder = SemanticEncoder()
+
+# Add embedding first
+encoder.add_embedding_to_form(form)
+
+# Store in database
+form_id = memory.store_form(form)
+```
+
+**Requirements:**
+- Form must have an embedding (use SemanticEncoder first)
+- Raises `GLCSMemoryError` if embedding is missing
+
+**`retrieve_form(form_id: UUID) -> LogicalForm`**
+
+Retrieve a stored LogicalForm by its ID.
+
+```python
+form = memory.retrieve_form(form_id)
+print(form.source_text)
+print(form.embedding.shape)  # (768,)
+```
+
+**`update_form(form: LogicalForm) -> UUID`**
+
+Update an existing LogicalForm.
+
+```python
+form.confidence_score = 0.95
+memory.update_form(form)
+```
+
+**`delete_form(form_id: UUID) -> bool`**
+
+Delete a LogicalForm from the database.
+
+```python
+success = memory.delete_form(form_id)
+```
+
+#### Query Operations
+
+**`search_similar_forms(embedding: np.ndarray, top_k: int = 5, context_id: Optional[str] = None) -> List[LogicalForm]`**
+
+Find LogicalForms semantically similar to the given embedding.
+
+```python
+# Find forms similar to a query
+query_embedding = encoder.encode("Socrates is mortal")
+similar_forms = memory.search_similar_forms(query_embedding, top_k=10)
+
+# Filter by context
+similar_in_context = memory.search_similar_forms(
+    query_embedding,
+    top_k=5,
+    context_id="session_123"
+)
+```
+
+**`get_forms_by_context(context_id: str) -> List[LogicalForm]`**
+
+Retrieve all LogicalForms in a specific context.
+
+```python
+forms = memory.get_forms_by_context("session_123")
+print(f"Found {len(forms)} forms in context")
+```
+
+**`search_by_entity(entity_name: str, role: Optional[str] = None, context_id: Optional[str] = None) -> List[LogicalForm]`**
+
+Search for forms containing a specific entity.
+
+```python
+# Find all forms mentioning "socrates"
+socrates_forms = memory.search_by_entity("socrates")
+
+# Find forms where "socrates" is the subject
+subject_forms = memory.search_by_entity("socrates", role="subject")
+
+# Filter by context
+context_forms = memory.search_by_entity(
+    "socrates",
+    role="subject",
+    context_id="session_123"
+)
+```
+
+**`search_by_relation(verb: str, context_id: Optional[str] = None) -> List[LogicalForm]`**
+
+Search for forms using a specific predicate/verb.
+
+```python
+# Find all forms using "is_mortal"
+mortal_forms = memory.search_by_relation("is_mortal")
+
+# Filter by context
+context_mortal = memory.search_by_relation(
+    "is_mortal",
+    context_id="session_123"
+)
+```
+
+#### Context Management
+
+**`list_contexts() -> List[str]`**
+
+Get all unique context IDs in the database.
+
+```python
+contexts = memory.list_contexts()
+print(f"Active contexts: {contexts}")
+```
+
+**`clear_context(context_id: str) -> int`**
+
+Delete all LogicalForms in a context.
+
+```python
+deleted_count = memory.clear_context("session_123")
+print(f"Deleted {deleted_count} forms")
+```
+
+**`get_context_stats(context_id: str) -> dict`**
+
+Get statistics about a context.
+
+```python
+stats = memory.get_context_stats("session_123")
+print(f"Total forms: {stats['total_forms']}")
+print(f"Logical types: {stats['logical_types']}")
+print(f"Polarities: {stats['polarities']}")
+print(f"Avg confidence: {stats['avg_confidence']:.2f}")
+```
+
+**Example Output:**
+```python
+{
+    'total_forms': 15,
+    'logical_types': {
+        'universal_rule': 3,
+        'ground_fact': 10,
+        'conditional_logic': 2
+    },
+    'polarities': {
+        'positive': 13,
+        'negative': 2
+    },
+    'avg_confidence': 0.87,
+    'unique_entities': 8,
+    'unique_relations': 5
+}
+```
+
+### Initialization
+
+**Persistent Mode (Production):**
+```python
+memory = MemoryManager(
+    collection_name="logical_forms",
+    persist_directory="./chroma_db",
+    in_memory=False
+)
+```
+
+**In-Memory Mode (Testing):**
+```python
+memory = MemoryManager(
+    collection_name="test_forms",
+    in_memory=True
+)
+```
+
+### Integration with GLCS Pipeline
+
+```
+User Input: "All humans are mortal"
+         ↓
+    [Logical Parser] (Stage 1.4)
+         ↓
+    Creates LogicalForm
+         ↓
+    [Semantic Encoder] (Stage 1.1)
+         ↓
+    Adds 768-dim embedding
+         ↓
+    [Memory Manager] ← YOU ARE HERE
+         ↓
+    Stores in ChromaDB with:
+    - Embedding for similarity search
+    - Metadata for filtering (context_id, logical_type, etc.)
+    - Full LogicalForm for reconstruction
+         ↓
+    Later retrieval via:
+    - similarity search
+    - context filtering
+    - entity/relation queries
+```
+
+### Data Storage Schema
+
+ChromaDB stores LogicalForms with:
+
+**Embeddings:** 768-dimensional vectors for similarity search
+
+**Metadata:** Indexed fields for filtering
+- `context_id`: Session identifier
+- `logical_type`: "universal_rule", "ground_fact", etc.
+- `polarity`: "positive" or "negative"
+- `subject_name`: Subject entity name
+- `predicate_verb`: Predicate verb
+- `object_name`: Object entity name (if present)
+- `confidence_score`: Float 0.0-1.0
+- `timestamp`: ISO format timestamp
+
+**Documents:** Original `source_text` for full-text search
+
+### Error Handling
+
+```python
+from glcs.utils.exceptions import GLCSMemoryError
+
+# Missing embedding
+try:
+    memory.store_form(form_without_embedding)
+except GLCSMemoryError as e:
+    print(e)  # "Cannot store form without embedding..."
+
+# Form not found
+try:
+    memory.retrieve_form(nonexistent_id)
+except GLCSMemoryError as e:
+    print(e)  # "Form not found: <uuid>..."
+
+# Empty context
+forms = memory.get_forms_by_context("nonexistent_context")
+# Returns empty list (not an error)
+```
+
+### Testing
+
+**Test File:** `tests/unit/test_memory_manager.py`
+
+**Coverage:** 84% (161/190 lines)
+
+**Test Categories:**
+- Initialization (2 tests)
+- Storage operations (7 tests)
+- Query operations (8 tests)
+- Context management (6 tests)
+- Error handling (3 tests)
+- Integration workflow (3 tests)
+
+**Run Tests:**
+```bash
+# Run memory manager tests
+poetry run pytest tests/unit/test_memory_manager.py -v
+
+# Check coverage
+poetry run pytest tests/unit/test_memory_manager.py --cov=glcs.core.memory_manager --cov-report=term-missing
+```
+
+### Design Decisions
+
+**Why ChromaDB?**
+- Native Python support (no external services)
+- Built-in vector similarity search
+- Dual-mode: in-memory for testing, persistent for production
+- Metadata filtering alongside similarity search
+- Active development and good documentation
+
+**Why store full metadata?**
+- Enables efficient filtering without loading full forms
+- Supports compound queries (e.g., "similar forms with positive polarity in context X")
+- Faster context statistics computation
+
+**Why normalize entity/relation names?**
+- Consistent searching ("Socrates" vs "socrates")
+- Matches LogicalForm normalization from data models
+
+---
+
+## Consistency Checker (Stage 1.3) ✅
+
+**File:** `glcs/core/consistency_checker.py`
+
+### Purpose
+
+The **ConsistencyChecker** detects logical inconsistencies in stored LogicalForm objects. It identifies:
+- **Contradictions:** Statements with conflicting truth values
+- **Redundancies:** Duplicate or highly similar statements
+- **Universal rule violations:** Ground facts contradicting universal rules
+
+### Key Features
+
+- **Polarity contradiction detection:** Opposite polarities with high semantic similarity
+- **Universal vs ground checking:** Ground facts violating universal rules
+- **Redundancy detection:** Exact duplicates and semantic near-duplicates
+- **Severity scoring:** HIGH, MEDIUM, LOW based on violation type and confidence
+- **Comprehensive reports:** Detailed ConsistencyReport with all violations
+
+### Consistency Checking
+
+#### `check_context_consistency(context_id: str) -> ConsistencyReport`
+
+Check all LogicalForms in a context for inconsistencies.
+
+```python
+from glcs.core.consistency_checker import ConsistencyChecker
+from glcs.core.memory_manager import MemoryManager
+from glcs.core.semantic_encoder import SemanticEncoder
+
+memory = MemoryManager()
+encoder = SemanticEncoder()
+checker = ConsistencyChecker(memory, encoder)
+
+# Check entire context
+report = checker.check_context_consistency("session_123")
+
+if not report.is_consistent:
+    print(f"Found {len(report.violations)} violations")
+    for violation in report.violations:
+        print(f"{violation.severity}: {violation.explanation}")
+```
+
+**Empty Context:** Returns consistent report with zero violations
+
+#### `check_form_against_context(form: LogicalForm, context_id: str) -> ConsistencyReport`
+
+Check if a new LogicalForm is consistent with existing context (useful before adding).
+
+```python
+# Before storing a new form
+new_form = LogicalForm(...)
+encoder.add_embedding_to_form(new_form)
+
+report = checker.check_form_against_context(new_form, "session_123")
+
+if report.is_consistent:
+    memory.store_form(new_form)
+else:
+    print("Warning: Form conflicts with existing knowledge")
+    for violation in report.violations:
+        print(f"  - {violation.explanation}")
+```
+
+### Violation Types
+
+#### 1. Polarity Contradiction
+
+**Detection:** Two semantically similar statements with opposite polarities.
+
+**Example:**
+```python
+form1: "Socrates is mortal" (POSITIVE)
+form2: "Socrates is not mortal" (NEGATIVE)
+→ POLARITY_CONTRADICTION (similarity ≥ 0.8)
+```
+
+**Severity:** Based on average confidence score
+- HIGH: avg_confidence ≥ 0.9
+- MEDIUM: avg_confidence ≥ 0.7
+- LOW: avg_confidence < 0.7
+
+**Requirements:**
+- Opposite polarities (POSITIVE vs NEGATIVE)
+- Structurally similar (same subject, predicate, object names)
+- High semantic similarity (cosine similarity ≥ 0.8)
+
+#### 2. Universal vs Ground Contradiction
+
+**Detection:** Ground fact violating a universal rule.
+
+**Example:**
+```python
+universal_rule: "All humans are mortal" (UNIVERSAL_RULE, POSITIVE)
+ground_fact: "Socrates is not mortal" (GROUND_FACT, NEGATIVE, object="mortal")
+→ UNIVERSAL_GROUND_CONTRADICTION
+```
+
+**Severity:** Always HIGH (universal rule violations are critical)
+
+**Requirements:**
+- One form is UNIVERSAL_RULE, other is GROUND_FACT
+- Opposite polarities
+- Ground fact's object matches universal rule's object (same category)
+
+#### 3. Exact Redundancy
+
+**Detection:** Identical source text (case-insensitive).
+
+**Example:**
+```python
+form1: "All humans are mortal"
+form2: "All humans are mortal"
+→ EXACT_REDUNDANCY
+```
+
+**Severity:** Always LOW (duplicates are minor issues)
+
+#### 4. Semantic Redundancy
+
+**Detection:** Very high semantic similarity (≥ redundancy_threshold).
+
+**Example:**
+```python
+form1: "All humans are mortal"
+form2: "Every person is mortal"
+→ SEMANTIC_REDUNDANCY (similarity ≥ 0.9)
+```
+
+**Severity:** Always LOW (near-duplicates are minor issues)
+
+**Requirements:**
+- Same polarity (different polarity = contradiction, not redundancy)
+- Cosine similarity ≥ redundancy_threshold (default 0.9)
+
+### Configuration
+
+**Redundancy Threshold:**
+
+```python
+# Default: 0.9 (very strict - only near-identical statements)
+checker = ConsistencyChecker(memory, encoder, redundancy_threshold=0.9)
+
+# More sensitive: 0.8 (catches more redundancies)
+checker = ConsistencyChecker(memory, encoder, redundancy_threshold=0.8)
+
+# Less sensitive: 0.95 (only exact paraphrases)
+checker = ConsistencyChecker(memory, encoder, redundancy_threshold=0.95)
+```
+
+### Violation Summary
+
+**`get_violation_summary(violations: List[Violation]) -> dict`**
+
+Generate statistics on violations.
+
+```python
+summary = checker.get_violation_summary(report.violations)
+
+print(f"Total violations: {summary['total']}")
+print(f"By type: {summary['by_type']}")
+print(f"By severity: {summary['by_severity']}")
+print(f"High severity count: {summary['high_severity_count']}")
+```
+
+**Example Output:**
+```python
+{
+    'total': 5,
+    'by_type': {
+        'POLARITY_CONTRADICTION': 2,
+        'SEMANTIC_REDUNDANCY': 3
+    },
+    'by_severity': {
+        'HIGH': 1,
+        'MEDIUM': 1,
+        'LOW': 3
+    },
+    'high_severity_count': 1
+}
+```
+
+### Integration with GLCS Pipeline
+
+```
+User adds new statement
+         ↓
+    [Logical Parser] (Stage 1.4)
+         ↓
+    Creates LogicalForm
+         ↓
+    [Semantic Encoder] (Stage 1.1)
+         ↓
+    Adds embedding
+         ↓
+    [Consistency Checker] ← YOU ARE HERE
+         ↓
+    Checks against existing forms in Memory Manager
+         ↓
+    If consistent:
+        [Memory Manager] stores form
+    If inconsistent:
+        Returns ConsistencyReport with violations
+        → User decides: store anyway, modify, or reject
+```
+
+### Consistency Report Structure
+
+```python
+ConsistencyReport(
+    report_id=UUID('...'),
+    context_id="session_123",
+    is_consistent=False,
+    violations=[
+        Violation(
+            violation_id=UUID('...'),
+            violation_type="POLARITY_CONTRADICTION",
+            conflicting_forms=[UUID('...'), UUID('...')],
+            severity="HIGH",
+            explanation="Polarity contradiction detected...",
+            detected_at=datetime(...)
+        )
+    ],
+    total_forms_checked=15,
+    generated_at=datetime(...),
+    metadata={}
+)
+```
+
+### Error Handling
+
+```python
+from glcs.utils.exceptions import ConsistencyError
+
+# Invalid threshold
+try:
+    checker = ConsistencyChecker(memory, encoder, redundancy_threshold=1.5)
+except ConsistencyError as e:
+    print(e)  # "redundancy_threshold must be between 0.0 and 1.0..."
+
+# Failed consistency check (rare - usually returns report with violations)
+try:
+    report = checker.check_context_consistency("invalid_context")
+except ConsistencyError as e:
+    print(e)  # "Failed to check context consistency..."
+```
+
+### Testing
+
+**Test File:** `tests/unit/test_consistency_checker.py`
+
+**Coverage:** 86% (149/170 lines)
+
+**Test Categories:**
+- Initialization (3 tests)
+- Polarity contradiction detection (2 tests)
+- Universal vs ground contradiction (2 tests)
+- Redundancy detection (2 tests)
+- Context consistency (3 tests)
+- Form vs context checking (2 tests)
+- Severity scoring (2 tests)
+- Violation summary (1 test)
+- Integration workflow (1 test)
+
+**Run Tests:**
+```bash
+# Run consistency checker tests
+poetry run pytest tests/unit/test_consistency_checker.py -v
+
+# Check coverage
+poetry run pytest tests/unit/test_consistency_checker.py --cov=glcs.core.consistency_checker --cov-report=term-missing
+```
+
+### Design Decisions
+
+**Why 0.8 threshold for contradictions but 0.9 for redundancies?**
+- Contradictions are critical - catch them early with lower threshold
+- Redundancies are minor - only flag very similar statements to avoid noise
+
+**Why separate polarity and universal-ground checks?**
+- Different logical patterns require different detection algorithms
+- Universal rules need special handling (they apply to categories, not individuals)
+- Enables more precise violation explanations
+
+**Why always LOW severity for redundancies?**
+- Redundancies don't compromise logical consistency
+- They're informational (help clean up knowledge base)
+- Users can ignore them without risk
+
+**Why structural similarity + semantic similarity?**
+- Structural check (same subject/predicate/object names) is fast
+- Semantic check (embedding similarity) catches paraphrases
+- Combined approach balances precision and recall
+
+### Practical Usage Patterns
+
+**Pattern 1: Validate Before Storing**
+```python
+def safe_store_form(form, context_id, memory, encoder, checker):
+    encoder.add_embedding_to_form(form)
+    report = checker.check_form_against_context(form, context_id)
+
+    if report.is_consistent:
+        memory.store_form(form)
+        return True
+    else:
+        high_severity = [v for v in report.violations if v.severity == "HIGH"]
+        if high_severity:
+            print("ERROR: Cannot store form - high severity violations")
+            return False
+        else:
+            print("WARNING: Minor violations detected, storing anyway")
+            memory.store_form(form)
+            return True
+```
+
+**Pattern 2: Periodic Context Audits**
+```python
+def audit_context(context_id, checker):
+    report = checker.check_context_consistency(context_id)
+    summary = checker.get_violation_summary(report.violations)
+
+    if summary['high_severity_count'] > 0:
+        print(f"ALERT: {summary['high_severity_count']} high-severity violations")
+        # Trigger review or cleanup
+
+    return summary
+```
+
+**Pattern 3: Conflict Resolution**
+```python
+def resolve_conflicts(report, memory):
+    for violation in report.violations:
+        if violation.severity == "HIGH":
+            forms = [memory.retrieve_form(fid) for fid in violation.conflicting_forms]
+
+            # Keep highest confidence form
+            best_form = max(forms, key=lambda f: f.confidence_score)
+            for form in forms:
+                if form.form_id != best_form.form_id:
+                    memory.delete_form(form.form_id)
+```
+
+---
+
 ## Next Steps
 
-After Stage 1.1 (Semantic Encoder), the following components will be built:
+After Stages 1.1-1.3, the following components will be built:
 
-- **Stage 1.2:** Memory Manager (stores LogicalForm objects with embeddings)
-- **Stage 1.3:** Consistency Checker (compares LogicalForms using embeddings)
 - **Stage 1.4:** Logical Parser (creates LogicalForm objects from natural language)
+- **Stage 1.5:** API Layer (REST endpoints for GLCS operations)
 
 ---
 
@@ -720,7 +1378,9 @@ After Stage 1.1 (Semantic Encoder), the following components will be built:
 
 ---
 
-**Last Updated**: Stage 1.1 (Semantic Encoder Complete)
-**Test Coverage**: 91% overall (111 tests, all passing)
+**Last Updated**: Stage 1.3 (Consistency Checker Complete)
+**Test Coverage**: 88% overall (165 tests, all passing)
 **Stage 0.3**: Data Models - 99% coverage (42 tests)
 **Stage 1.1**: Semantic Encoder - 97% coverage (32 tests)
+**Stage 1.2**: Memory Manager - 84% coverage (29 tests)
+**Stage 1.3**: Consistency Checker - 86% coverage (18 tests)

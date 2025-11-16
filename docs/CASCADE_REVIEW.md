@@ -1289,5 +1289,649 @@ def add_embedding_to_form(form: LogicalForm, model_name: str = "all-mpnet-base-v
 
 ---
 
-**Last Review**: Stage 1.1 completion
-**Next Review**: After Stage 1.2 (Memory Manager)
+## Stage 1.2: Memory Manager - Cascade Analysis
+
+### ✅ Decisions Made (Fixed Contracts)
+
+1. **Vector Database: ChromaDB**
+   - Embedded database (no external service required)
+   - In-memory mode for testing, persistent for production
+   - Built-in similarity search with metadata filtering
+   - **Impact**: All vector storage uses ChromaDB API
+   - **Contract**: CRUD operations + semantic search interface
+   - **Dependency Added**: chromadb ^0.5.20 (~65 additional packages)
+
+2. **Dual-Mode Operation**
+   ```python
+   # In-memory (testing)
+   MemoryManager(collection_name="test", in_memory=True)
+
+   # Persistent (production)
+   MemoryManager(collection_name="forms", persist_directory="./chroma_db")
+   ```
+   - **Impact**: Tests use in-memory, production uses persistent
+   - **Contract**: Both modes have identical API
+
+3. **Storage Schema**
+   - **Embeddings**: 768-dimensional vectors (from SemanticEncoder)
+   - **Metadata**: Indexed fields for filtering
+     - `context_id`, `logical_type`, `polarity`
+     - `subject_name`, `predicate_verb`, `object_name`
+     - `confidence_score`, `timestamp`
+   - **Documents**: Original `source_text`
+   - **Impact**: Enables fast filtering + semantic search
+   - **Contract**: Cannot change metadata structure without migration
+
+4. **Required Embedding on Storage**
+   - `store_form()` requires LogicalForm.embedding to be set
+   - Raises `GLCSMemoryError` if embedding is None
+   - **Impact**: Forces SemanticEncoder usage before storage
+   - **Contract**: Enforces proper pipeline order
+
+5. **Context-Based Organization**
+   - All queries can filter by `context_id`
+   - Contexts are logical groupings (sessions/conversations)
+   - **Impact**: Enables multi-session isolation
+   - **Contract**: context_id is primary organizational unit
+
+6. **Entity/Relation Normalization Matching**
+   - Stores normalized forms (lowercase, trimmed)
+   - Matches LogicalForm normalization from Stage 0.3
+   - **Impact**: Consistent search behavior
+   - **Contract**: Search queries automatically normalized
+
+### 🔗 Component Dependencies
+
+**MemoryManager depends on:**
+- `glcs.core.models.LogicalForm` (CRITICAL)
+  - Reads: All fields for storage
+  - Validates: embedding is present
+- `chromadb` (CRITICAL)
+  - Uses: Collection operations, similarity search
+- `glcs.core.semantic_encoder.SemanticEncoder` (for integration)
+  - Uses: Must be called before storage
+- `numpy` (CRITICAL)
+  - Uses: Embedding array operations
+
+**Components that depend on MemoryManager:**
+- **Consistency Checker (Stage 1.3)**: Calls `get_forms_by_context()` to retrieve forms for checking
+- **Logical Parser (Stage 1.4)**: Stores parsed forms via `store_form()`
+- **API Layer (Stage 2.x)**: Exposes storage/retrieval endpoints
+
+### ⚠️ Potential Cascade Effects
+
+#### If ChromaDB is Replaced (e.g., with FAISS/Pinecone)
+**Impact**: HIGH - Major refactoring required
+
+**What breaks:**
+- All ChromaDB-specific API calls
+- Collection management code
+- Metadata filtering logic (different API)
+- In-memory mode implementation
+
+**Action needed:**
+1. **Create abstraction layer** for vector DB operations
+2. **Implement new backend** with same interface
+3. **Migrate stored data** to new format
+4. **Update tests** for new backend
+5. **Update configuration** with new DB settings
+6. **Performance testing** (may differ significantly)
+
+**Recommendation**: Stick with ChromaDB unless strong reason to change
+
+#### If Storage Metadata Schema Changes
+**Impact**: MEDIUM-HIGH - Requires data migration
+
+**Example**: Add new metadata field `parser_version`
+
+**What breaks:**
+- Existing stored forms lack new field
+- Queries filtering on new field return no results
+- Reconstruction logic expects new field
+
+**Action needed:**
+1. **Update `store_form()` method** to include new metadata
+2. **Migrate existing data** (add default values)
+3. **Update query methods** to handle new field
+4. **Update tests** with new metadata
+5. **Update documentation**
+
+**Recommendation**: Add new metadata as optional, backfill later
+
+#### If Embedding Requirement is Removed
+**Impact**: HIGH - Breaks consistency checking
+
+**Scenario**: Allow storing forms without embeddings
+
+**What breaks:**
+- `search_similar_forms()` fails (no embedding to compare)
+- Consistency Checker semantic similarity checks fail
+- Vector search becomes impossible
+
+**Action needed:**
+- DON'T remove this requirement
+- Embeddings are core to GLCS semantic capabilities
+
+**Recommendation**: Keep embedding requirement mandatory
+
+#### If Context Organization Changes
+**Impact**: MEDIUM - Affects all context-based queries
+
+**Scenario**: Add hierarchical contexts (e.g., `session.conversation.turn`)
+
+**What breaks:**
+- Current flat context_id structure
+- `get_forms_by_context()` returns too many results
+- `list_contexts()` format changes
+
+**Action needed:**
+1. **Update context_id format** (e.g., dot-separated)
+2. **Add context hierarchy parsing**
+3. **Update query methods** to support hierarchy
+4. **Migrate existing context IDs**
+5. **Update tests**
+
+**Recommendation**: Keep flat structure for now, add hierarchy later if needed
+
+#### If CRUD Methods Change Signatures
+**Impact**: MEDIUM - Breaks dependent code
+
+**Current signatures:**
+```python
+def store_form(form: LogicalForm) -> UUID
+def retrieve_form(form_id: UUID) -> LogicalForm
+def update_form(form: LogicalForm) -> UUID
+def delete_form(form_id: UUID) -> bool
+```
+
+**If changed** (example: add version tracking):
+```python
+def store_form(form: LogicalForm, version: int = 1) -> UUID
+```
+
+**What breaks:**
+- Parser calls to `store_form()`
+- API endpoints
+- Integration tests
+
+**Action needed:**
+- Make new parameters **optional** with defaults
+- Update all call sites gradually
+- Deprecate old signature if needed
+
+### 📊 Contracts Established
+
+#### Contract 1: Embedding Required for Storage
+**Enforced by:** `store_form()` validation
+**Used by:** Consistency Checker, semantic search
+**Breaking change if violated:** Yes
+
+**Test verification:**
+```python
+# tests/unit/test_memory_manager.py::test_store_form_without_embedding_raises_error
+```
+
+#### Contract 2: CRUD Operations Return Specific Types
+**Enforced by:** Type hints and implementation
+**Used by:** All components storing/retrieving forms
+**Breaking change if violated:** Yes
+
+**Signatures:**
+- `store_form()` → UUID
+- `retrieve_form()` → LogicalForm
+- `update_form()` → UUID
+- `delete_form()` → bool
+
+#### Contract 3: Context Isolation
+**Enforced by:** Metadata filtering in ChromaDB
+**Used by:** Multi-session applications
+**Breaking change if violated:** Moderate
+
+**Test verification:**
+```python
+# tests/unit/test_memory_manager.py::test_get_forms_by_context_isolation
+```
+
+#### Contract 4: Semantic Search Returns Ranked Results
+**Enforced by:** ChromaDB similarity scoring
+**Used by:** Consistency Checker, future retrieval features
+**Breaking change if violated:** Moderate
+
+**Contract:**
+- Returns up to `top_k` results
+- Results sorted by similarity (highest first)
+- Can filter by context_id
+
+### 🚨 High-Risk Changes
+
+**NEVER change these without full team review:**
+1. **Vector database choice** (ChromaDB) - HIGH
+2. **Embedding requirement** (mandatory) - CRITICAL
+3. **Metadata schema** (structure) - MEDIUM-HIGH
+4. **CRUD method signatures** - MEDIUM
+5. **Context_id structure** (flat string) - MEDIUM
+
+**Low-risk changes (safe to modify):**
+1. Default collection names
+2. Persist directory paths
+3. Error messages
+4. Internal helper methods
+5. Statistics computation logic
+
+### 🔄 Integration with Previous Stages
+
+**Integrates with:**
+
+**Stage 0.3 (Data Models):**
+- Uses `LogicalForm`, `Entity`, `Relation`
+- Enforces embedding validation
+- Relies on normalized entity/relation names
+
+**Stage 1.1 (Semantic Encoder):**
+- Requires forms to have embeddings before storage
+- Uses 768-dimensional embeddings
+- Pipeline: Encode → Store
+
+**Stage 0.2 (Configuration):**
+- Could use config for persist_directory (future enhancement)
+- Exception hierarchy: raises `GLCSMemoryError`
+
+### 📋 Test Coverage
+
+**Test File:** `tests/unit/test_memory_manager.py`
+**Coverage:** 84% (161/190 lines)
+**Tests:** 29 tests, all passing
+
+**Uncovered lines:** Exception paths (form not found, empty contexts, etc.)
+
+---
+
+## Stage 1.3: Consistency Checker - Cascade Analysis
+
+### ✅ Decisions Made (Fixed Contracts)
+
+1. **Violation Types (4 types)**
+   - **POLARITY_CONTRADICTION**: Opposite polarities + high similarity (≥ 0.8)
+   - **UNIVERSAL_GROUND_CONTRADICTION**: Ground fact violating universal rule
+   - **EXACT_REDUNDANCY**: Identical source text (case-insensitive)
+   - **SEMANTIC_REDUNDANCY**: High similarity + same polarity (≥ redundancy_threshold)
+   - **Impact**: Future code may expect these specific types
+   - **Contract**: Violation.violation_type uses these exact strings
+
+2. **Similarity Thresholds**
+   - **Contradiction detection**: 0.8 (hardcoded in code)
+   - **Redundancy detection**: 0.9 (configurable via init parameter)
+   - **Impact**: Affects sensitivity of detection
+   - **Contract**: Thresholds are numeric, not in config (for now)
+
+3. **Severity Levels (3 levels)**
+   - **HIGH**: Universal rule violations, high-confidence contradictions (avg ≥ 0.9)
+   - **MEDIUM**: Medium-confidence contradictions (avg ≥ 0.7)
+   - **LOW**: Redundancies, low-confidence contradictions
+   - **Impact**: API consumers may filter by severity
+   - **Contract**: Severity must be exactly "HIGH", "MEDIUM", or "LOW"
+
+4. **Consistency Checking Strategy**
+   - **Pairwise comparison**: O(n²) complexity
+   - **Structural similarity first**: Fast filter (same subject/predicate/object)
+   - **Semantic similarity second**: Slower (embedding comparison)
+   - **Impact**: Performance degrades with many forms in context
+   - **Contract**: All forms are compared exhaustively
+
+5. **Two Check Methods**
+   ```python
+   # Check entire context
+   check_context_consistency(context_id: str) -> ConsistencyReport
+
+   # Check new form against context
+   check_form_against_context(form: LogicalForm, context_id: str) -> ConsistencyReport
+   ```
+   - **Impact**: Two different use cases (audit vs. pre-validation)
+   - **Contract**: Both return ConsistencyReport with same structure
+
+6. **Integration with MemoryManager**
+   - Calls `memory.get_forms_by_context(context_id)`
+   - Depends on MemoryManager retrieval accuracy
+   - **Impact**: Consistency checking limited to what's in memory
+   - **Contract**: MemoryManager is source of truth
+
+### 🔗 Component Dependencies
+
+**ConsistencyChecker depends on:**
+- `glcs.core.models` (CRITICAL)
+  - Uses: `LogicalForm`, `Violation`, `ConsistencyReport`, `LogicalType`, `Polarity`
+  - Creates: Violation and ConsistencyReport objects
+- `glcs.core.memory_manager.MemoryManager` (CRITICAL)
+  - Calls: `get_forms_by_context()`
+  - Depends on: Accurate retrieval of all forms in context
+- `glcs.core.semantic_encoder.SemanticEncoder` (CRITICAL)
+  - Calls: `cosine_similarity(emb1, emb2)`
+  - Depends on: L2-normalized embeddings
+
+**Components that will depend on ConsistencyChecker:**
+- **API Layer (Stage 2.x)**: Exposes consistency checking endpoints
+- **Logical Parser (Stage 1.4)**: May call `check_form_against_context()` before storing
+- **Future UI**: Displays violations to users
+
+### ⚠️ Potential Cascade Effects
+
+#### If Similarity Thresholds Change
+**Impact**: MEDIUM - Changes detection sensitivity
+
+**Scenario**: Change contradiction threshold from 0.8 to 0.7
+
+**What breaks:**
+- Nothing (backward compatible)
+- **Affects behavior**:
+  - More contradictions detected (more false positives)
+  - May overwhelm users with violations
+
+**Action needed:**
+1. **Move thresholds to config** (future enhancement)
+2. **Test new threshold** on sample data
+3. **Document threshold** in user guide
+4. **Update tests** with new expected results
+
+**Recommendation**: Make thresholds configurable via init parameters
+
+#### If New Violation Types Added
+**Impact**: LOW - Additive change
+
+**Example**: Add `TEMPORAL_CONTRADICTION` (conflicting time claims)
+
+**What breaks:**
+- Nothing (backward compatible)
+
+**Action needed:**
+1. **Add detection logic** in new method
+2. **Call new method** from `check_context_consistency()`
+3. **Add tests** for new violation type
+4. **Update documentation**
+5. **Update `get_violation_summary()` if needed**
+
+**Recommendation**: Easy to add, document well
+
+#### If Severity Calculation Changes
+**Impact**: MEDIUM - Changes violation priority
+
+**Scenario**: Make all polarity contradictions HIGH (ignore confidence)
+
+**What breaks:**
+- Existing violations may have different severity
+- API consumers filtering by severity affected
+- User workflows expecting current severities
+
+**Action needed:**
+1. **Update `_calculate_severity()` method**
+2. **Re-check all stored violations** (if cached)
+3. **Update documentation**
+4. **Inform users** of severity changes
+
+**Recommendation**: Document severity logic clearly, change carefully
+
+#### If Consistency Checking Algorithm Changes
+**Impact**: MEDIUM-HIGH - May find different violations
+
+**Scenario**: Use semantic similarity only (remove structural check)
+
+**What breaks:**
+- May find more contradictions (performance impact)
+- Different forms flagged as violations
+- Tests expecting specific violations may fail
+
+**Action needed:**
+1. **Benchmark performance** (O(n²) semantic checks expensive)
+2. **Test on sample data** (precision/recall changes)
+3. **Update tests** with new expected results
+4. **Document algorithm** changes
+
+**Recommendation**: Keep hybrid approach (structural + semantic)
+
+#### If MemoryManager API Changes
+**Impact**: HIGH - Breaks integration
+
+**Scenario**: `get_forms_by_context()` signature changes
+
+**What breaks:**
+- ConsistencyChecker can't retrieve forms
+- `check_context_consistency()` fails
+
+**Action needed:**
+1. **Update ConsistencyChecker** to use new API
+2. **Update tests**
+3. **Coordinate changes** with MemoryManager stage
+
+**Recommendation**: Keep MemoryManager API stable
+
+#### If ConsistencyReport Structure Changes
+**Impact**: HIGH - Breaks API consumers
+
+**Scenario**: Add new field `recommendations: List[str]`
+
+**What breaks:**
+- API consumers expecting old structure
+- Serialization/deserialization may fail
+- Tests expecting specific fields
+
+**Action needed:**
+1. **Make new field optional** (backward compatible)
+2. **Update API documentation**
+3. **Version API** if breaking change
+4. **Update tests**
+
+**Recommendation**: Add optional fields only, version breaking changes
+
+### 📊 Contracts Established
+
+#### Contract 1: Four Violation Types
+**Enforced by:** Implementation logic
+**Used by:** API consumers, violation summaries
+**Breaking change if violated:** No (can add more)
+
+**Types:**
+- POLARITY_CONTRADICTION
+- UNIVERSAL_GROUND_CONTRADICTION
+- EXACT_REDUNDANCY
+- SEMANTIC_REDUNDANCY
+
+#### Contract 2: Three Severity Levels
+**Enforced by:** `_calculate_severity()` method, Violation model validation
+**Used by:** API consumers, filtering logic
+**Breaking change if violated:** Yes (Violation model enforces)
+
+**Levels:** "HIGH", "MEDIUM", "LOW"
+
+#### Contract 3: ConsistencyReport Format
+**Enforced by:** Pydantic ConsistencyReport model
+**Used by:** API responses, violation display
+**Breaking change if violated:** Yes
+
+**Fields:**
+- `report_id`, `context_id`, `is_consistent`
+- `violations: List[Violation]`
+- `total_forms_checked`, `generated_at`, `metadata`
+
+#### Contract 4: Pairwise Exhaustive Checking
+**Enforced by:** Implementation (nested loops)
+**Used by:** Consistency guarantees
+**Breaking change if violated:** Moderate
+
+**Guarantee:** All pairs of forms are compared (no violations missed)
+
+#### Contract 5: Empty Context is Consistent
+**Enforced by:** `check_context_consistency()` logic
+**Used by:** API consumers
+**Breaking change if violated:** Moderate
+
+**Behavior:** Returns `is_consistent=True` with `violations=[]`
+
+### 🚨 High-Risk Changes
+
+**NEVER change these without full team review:**
+1. **Violation types** (removal) - MEDIUM
+2. **Severity levels** (values) - HIGH (Violation model enforces)
+3. **ConsistencyReport structure** (required fields) - HIGH
+4. **Method signatures** (`check_context_consistency`, `check_form_against_context`) - MEDIUM
+5. **Exhaustive checking guarantee** - MEDIUM
+
+**Low-risk changes (safe to modify):**
+1. Similarity thresholds (make configurable)
+2. Add new violation types (additive)
+3. Add optional fields to ConsistencyReport
+4. Improve algorithm efficiency (same results)
+5. Error messages and explanations
+
+### 🔄 Integration with Previous Stages
+
+**Integrates with:**
+
+**Stage 0.3 (Data Models):**
+- Creates `Violation` and `ConsistencyReport` objects
+- Uses `LogicalType` and `Polarity` enums
+- Relies on `LogicalForm` structure
+
+**Stage 1.1 (Semantic Encoder):**
+- Calls `encoder.cosine_similarity(emb1, emb2)`
+- Depends on L2-normalized embeddings
+- Uses 768-dimensional vectors
+
+**Stage 1.2 (Memory Manager):**
+- Calls `memory.get_forms_by_context(context_id)`
+- Depends on accurate form retrieval
+- Assumes embeddings are present
+
+**Stage 0.2 (Exceptions):**
+- Raises `ConsistencyError` on failures
+- Follows exception hierarchy
+
+### 📋 Test Coverage
+
+**Test File:** `tests/unit/test_consistency_checker.py`
+**Coverage:** 86% (149/170 lines)
+**Tests:** 18 tests, all passing
+
+**Test Categories:**
+- Initialization (3 tests)
+- Polarity contradiction detection (2 tests)
+- Universal vs ground contradiction (2 tests)
+- Redundancy detection (2 tests)
+- Context consistency checking (3 tests)
+- Form vs context checking (2 tests)
+- Severity scoring (2 tests)
+- Violation summary (1 test)
+- Full integration workflow (1 test)
+
+**Uncovered lines:** Exception paths, edge cases in severity calculation
+
+### 📊 Performance Considerations
+
+**Complexity:** O(n²) where n = number of forms in context
+
+**Bottlenecks:**
+- Semantic similarity calculations (costly)
+- Large contexts (100+ forms) may be slow
+
+**Optimization opportunities:**
+1. Cache similarity calculations
+2. Use structural filtering more aggressively
+3. Implement sampling for very large contexts
+4. Parallelize pairwise comparisons
+
+**Recommendation:** Monitor performance, optimize if needed in future
+
+---
+
+## Stage Completion Status
+
+- ✅ **Stage 0.1**: Complete
+  - Dependencies: Poetry, Python 3.10+, package structure
+  - Contracts: Import paths, package name
+  - Risk: Changing these is HIGH impact
+
+- ✅ **Stage 0.2**: Complete
+  - Dependencies: PyYAML, config schema, exception hierarchy
+  - Contracts: Config file structure, logger usage pattern, exception types
+  - Risk: Config schema changes are HIGH impact, exceptions are MEDIUM impact
+
+- ✅ **Stage 0.3**: Complete
+  - Dependencies: Pydantic, numpy, sentence-transformers
+  - Contracts: Data model schemas (LogicalForm, etc.), 768-dim embeddings, validation rules
+  - Risk: Model schema changes are CRITICAL impact
+  - Test Coverage: 99% (42 tests passing)
+
+- ✅ **Stage 1.1**: Complete
+  - Dependencies: sentence-transformers (all-mpnet-base-v2), PyTorch
+  - Contracts: 768-dim embeddings, L2 normalization, model singleton, method signatures
+  - Risk: Model/dimension changes are CRITICAL, normalization changes HIGH
+  - Test Coverage: 97% (32 tests passing)
+
+- ✅ **Stage 1.2**: Complete
+  - Dependencies: ChromaDB (vector database)
+  - Contracts: CRUD operations, embedding requirement, context isolation, metadata schema
+  - Risk: Database changes HIGH, metadata schema MEDIUM-HIGH, embedding requirement CRITICAL
+  - Test Coverage: 84% (29 tests passing)
+
+- ✅ **Stage 1.3**: Complete
+  - Dependencies: MemoryManager, SemanticEncoder, data models
+  - Contracts: Violation types, severity levels, ConsistencyReport structure, exhaustive checking
+  - Risk: Report structure HIGH, severity levels HIGH, violation types MEDIUM
+  - Test Coverage: 86% (18 tests passing)
+  - Overall Coverage: 88% (165 tests total)
+
+---
+
+## Dependency Graph (Updated)
+
+```
+pyproject.toml
+    ↓
+Poetry install
+    ↓
+Dependencies: Pydantic, numpy, sentence-transformers, chromadb
+    ↓
+glcs.core.models (Stage 0.3)
+    ↓
+    ├─→ glcs.core.semantic_encoder (Stage 1.1)
+    │       ↓
+    │   Adds embeddings to LogicalForm
+    │       ↓
+    ├─→ glcs.core.memory_manager (Stage 1.2)
+    │       ↓
+    │   Stores LogicalForm in ChromaDB
+    │       ↓
+    └─→ glcs.core.consistency_checker (Stage 1.3)
+            ↓
+        Retrieves forms from MemoryManager
+        Uses SemanticEncoder for similarity
+        Creates ConsistencyReport with Violations
+```
+
+**Critical Dependencies:**
+1. LogicalForm → ALL components (CRITICAL)
+2. SemanticEncoder → MemoryManager, ConsistencyChecker
+3. MemoryManager → ConsistencyChecker
+4. 768-dim embeddings → Encoder, Memory, Checker
+
+---
+
+## Notes for Future Developers
+
+1. **Import paths are sacred**: Once established, very hard to change
+2. **Config schema is a contract**: Version it if you change it
+3. **Data models are contracts**: Use migrations for schema changes
+4. **Embedding dimension is fixed**: Don't change without full system reset
+5. **Test for cascade effects**: When changing core components, run FULL test suite
+6. **Document breaking changes**: Keep CHANGELOG.md updated
+7. **LogicalForm is the heart**: ALL components depend on it - changes cascade everywhere
+8. **Model choice is permanent**: Changing sentence-transformers model = data migration
+9. **Normalization matters**: L2 normalization enables fast similarity calculations
+10. **ChromaDB is embedded**: No external service, dual-mode (in-memory + persistent)
+11. **Embedding is mandatory**: Cannot store forms without embeddings
+12. **Context isolation**: All operations respect context boundaries
+13. **Consistency checking is exhaustive**: O(n²) pairwise comparison
+14. **Violations have fixed types**: Adding is OK, removing requires migration
+
+---
+
+**Last Review**: Stage 1.3 completion
+**Next Review**: After Stage 1.4 (Logical Parser)
