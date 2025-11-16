@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 import numpy as np
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # ============================================================================
@@ -203,8 +203,7 @@ class LogicalForm(BaseModel):
     embedding: Optional[np.ndarray] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    class Config:
-        arbitrary_types_allowed = True  # Allow numpy arrays
+    model_config = ConfigDict(arbitrary_types_allowed=True)  # Allow numpy arrays
 
     @field_validator('embedding')
     @classmethod
