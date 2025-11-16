@@ -246,8 +246,311 @@ from glcs_new import *
   - Contracts: Import paths, package name
   - Risk: Changing these is HIGH impact
 
-- ⏳ **Stage 0.2**: Not started
+- ✅ **Stage 0.2**: Complete
+  - Dependencies: PyYAML, config schema, exception hierarchy
+  - Contracts: Config file structure, logger usage pattern, exception types
+  - Risk: Config schema changes are HIGH impact, exceptions are MEDIUM impact
+
 - ⏳ **Stage 0.3**: Not started
+
+---
+
+## Stage 0.2: Configuration System - Cascade Analysis
+
+### ✅ Decisions Made (Fixed Contracts)
+
+1. **Configuration Schema Structure**
+   ```yaml
+   memory:
+     vector_dimension: 768
+     similarity_threshold: 0.85
+     initial_capacity: 1000
+
+   consistency:
+     direct_contradiction_threshold: 0.85
+     confidence_threshold: 0.5
+
+   encoder:
+     model_name: "sentence-transformers/all-MiniLM-L6-v2"
+     batch_size: 32
+
+   parser:
+     llm_provider: "openai"
+     model: "gpt-4o-mini"
+     max_retries: 3
+     timeout: 30
+
+   logging:
+     level: "INFO"
+     format: "simple"
+   ```
+   - **Impact**: All components depend on this structure
+   - **Contract**: Nested YAML with 5 required sections
+
+2. **Required Configuration Sections**
+   - `memory`, `consistency`, `encoder`, `parser`, `logging`
+   - **Impact**: Config validation enforces these sections
+   - **Breaking change if modified**: Must update validation + all code reading config
+
+3. **Vector Dimension: 768**
+   - Fixed based on encoder model choice (all-MiniLM-L6-v2 → 768-dim after projection)
+   - **CRITICAL**: Memory manager, encoder, and all vector operations depend on this
+   - **Changing requires**: Re-encode all data, clear memory, update all components
+
+4. **Exception Hierarchy**
+   ```
+   GLCSException (base)
+   ├── ConfigurationError
+   ├── MemoryError
+   ├── ConsistencyError
+   ├── ValidationError
+   └── ParsingError
+   ```
+   - **Impact**: All error handling uses these exceptions
+   - **Contract**: Never use generic Exception, always use specific GLCS exceptions
+
+5. **Logger Usage Pattern**
+   ```python
+   from glcs.utils.logger import get_logger
+   logger = get_logger(__name__)
+   ```
+   - **Impact**: All modules must follow this pattern
+   - **Contract**: Don't use print() or raw logging module
+
+6. **Configuration Loading Pattern**
+   ```python
+   from glcs.utils.config_manager import load_config
+   config = load_config("config/glcs_config.yaml")
+   ```
+   - **Impact**: All components use this centralized approach
+   - **Contract**: Don't hardcode parameters
+
+### ⚠️ Cascade Effects - What Changes Break What
+
+#### If Config Schema Changes
+
+**Scenario**: Add new section or rename existing section
+
+**Impact**: CRITICAL
+- **Breaks**:
+  - `config_manager.validate_config()` (needs updated REQUIRED_SECTIONS)
+  - All components reading that section
+  - All tests expecting old structure
+  - Documentation (config/README.md, glcs/utils/README.md)
+
+**Action needed**:
+1. Update `REQUIRED_SECTIONS` in `config_manager.py`
+2. Update validation logic
+3. Update `config/glcs_config.yaml`
+4. Update all components reading the changed section
+5. Update tests
+6. Update documentation
+7. Consider config versioning
+
+**Example**:
+```python
+# Adding new section 'inference'
+REQUIRED_SECTIONS = ["memory", "consistency", "encoder", "parser", "logging", "inference"]
+# Must also add inference section to config file
+# Must update validation tests
+```
+
+#### If Config Parameter Changes
+
+**Scenario**: Change `memory.vector_dimension` from 768 to 1024
+
+**Impact**: CRITICAL
+- **Breaks**:
+  - Encoder (must use model that outputs 1024-dim)
+  - Memory manager (expects 768-dim vectors)
+  - All stored vectors (wrong dimension)
+  - Similarity search (dimension mismatch)
+
+**Action needed**:
+1. Change encoder model to one that outputs 1024-dim
+2. Update `vector_dimension` in config
+3. **Clear all stored memory** (old vectors incompatible)
+4. Re-encode all data
+5. Update tests
+
+**Recommendation**: DON'T change vector dimension after deployment
+
+#### If Exception Types Change
+
+**Scenario**: Add new exception type `InferenceError`
+
+**Impact**: LOW-MEDIUM
+- **Breaks**: Nothing (backward compatible)
+- **Needs updates**:
+  - `glcs/utils/exceptions.py` (add new class)
+  - `tests/unit/test_exceptions.py` (add tests)
+  - `glcs/utils/README.md` (document new exception)
+
+**Action needed**:
+1. Add exception class inheriting from GLCSException
+2. Add docstring with usage examples
+3. Add tests
+4. Document in README
+
+**Example**:
+```python
+class InferenceError(GLCSException):
+    """Raised when inference operations fail."""
+    pass
+```
+
+#### If Logger Format Changes
+
+**Scenario**: Change from `simple` to `json` format in config
+
+**Impact**: LOW
+- **Breaks**: Nothing (just changes output format)
+- **Affects**: Log parsing scripts (if any)
+
+**Action needed**:
+1. Update `config/glcs_config.yaml` or `config/logging.yaml`
+2. Update log parsing tools (if any)
+3. Restart application
+
+#### If PyYAML is Removed/Replaced
+
+**Impact**: HIGH
+- **Breaks**:
+  - Config loading (uses PyYAML)
+  - Logger setup (uses PyYAML)
+
+**Action needed**:
+1. Find alternative (e.g., TOML, JSON)
+2. Convert all config files to new format
+3. Update `load_config()` implementation
+4. Update `setup_logging()` implementation
+5. Update all tests
+6. Update documentation
+
+**Recommendation**: DON'T change this - PyYAML is standard
+
+### 🔄 What CAN Be Changed Safely
+
+1. ✅ **Add new config parameters** (within existing sections)
+   - Impact: None if optional
+   - Just add to config file and access with `get_config_value(..., default=X)`
+
+2. ✅ **Change parameter values** (not structure)
+   - Example: `similarity_threshold: 0.85` → `0.90`
+   - Impact: Changes behavior but doesn't break code
+   - Test after changing
+
+3. ✅ **Add new exception types**
+   - Must inherit from GLCSException
+   - Backward compatible
+   - Add tests and documentation
+
+4. ✅ **Change log levels**
+   - Impact: Changes verbosity, doesn't break code
+   - Safe to change
+
+5. ✅ **Add new utility functions** to config_manager, logger
+   - Impact: None (additive change)
+   - Just document them
+
+### 🚫 What CANNOT Be Changed Without Major Work
+
+1. ❌ **Config file format** (YAML → JSON/TOML)
+   - Breaks: Everything reading config
+   - Effort: Very high
+
+2. ❌ **Remove required config sections**
+   - Breaks: Validation, all code expecting that section
+   - Effort: High
+
+3. ❌ **Change exception base class** (GLCSException → something else)
+   - Breaks: All exception catching code
+   - Effort: Very high
+
+4. ❌ **Remove logger functions** (get_logger, setup_logging)
+   - Breaks: All modules using logger
+   - Effort: Very high
+
+### 📋 Component Dependencies (Post Stage 0.2)
+
+```
+config/glcs_config.yaml (defines)
+    ↓
+glcs/utils/config_manager.py (loads & validates)
+    ↓
+All components (memory, encoder, parser, checker)
+    ↓
+Use config values for behavior
+
+config/logging.yaml (defines)
+    ↓
+glcs/utils/logger.py (loads & initializes)
+    ↓
+All modules (get_logger(__name__))
+    ↓
+Log to configured handlers
+
+glcs/utils/exceptions.py (defines)
+    ↓
+All modules (import and raise)
+    ↓
+Error handling throughout system
+```
+
+### 🎯 Action Items for Future Stages
+
+**All future components MUST**:
+1. Load config using `config_manager.load_config()`
+2. Use logger via `logger.get_logger(__name__)`
+3. Raise specific exceptions (not generic Exception)
+4. Access config values with `get_config_value()` and defaults
+5. Document which config parameters they use
+
+**Example Component Pattern**:
+```python
+from glcs.utils.config_manager import load_config, get_config_value
+from glcs.utils.logger import get_logger
+from glcs.utils.exceptions import ComponentError
+
+class NewComponent:
+    def __init__(self, config_path="config/glcs_config.yaml"):
+        self.logger = get_logger(__name__)
+        self.config = load_config(config_path)
+
+        # Extract component-specific config with defaults
+        self.param = get_config_value(
+            self.config,
+            "new_section.param",
+            default=42
+        )
+
+        self.logger.info("NewComponent initialized")
+```
+
+### 📊 Stage 0.2 Impact Summary
+
+**Created Contracts**:
+- Config schema structure (5 sections, nested YAML)
+- Exception hierarchy (6 exception types)
+- Logger usage pattern (get_logger(__name__))
+- Config loading pattern (load_config + get_config_value)
+
+**High-Risk Changes**:
+- Modifying config schema structure
+- Changing vector_dimension
+- Removing exception types
+- Changing config file format
+
+**Low-Risk Changes**:
+- Adding new config parameters (with defaults)
+- Adding new exception types (inherit from GLCSException)
+- Changing config values (not structure)
+- Changing log levels
+
+**Dependencies Created**:
+- All components → config_manager (for config)
+- All components → logger (for logging)
+- All components → exceptions (for error handling)
 
 ---
 
@@ -261,5 +564,5 @@ from glcs_new import *
 
 ---
 
-**Last Review**: Stage 0.1 completion
-**Next Review**: After Stage 0.2 (Configuration System)
+**Last Review**: Stage 0.2 completion
+**Next Review**: After Stage 0.3 (Data Models)
