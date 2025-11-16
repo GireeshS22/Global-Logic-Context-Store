@@ -1022,10 +1022,236 @@ If LogicalForm MUST change:
 
 ---
 
+## Stage 1.1: Semantic Encoder
+
+### ✅ Decisions Made (Fixed)
+
+1. **Model: `all-mpnet-base-v2`**
+   - Produces exactly 768-dimensional embeddings
+   - Downloaded from HuggingFace on first use (~420MB)
+   - **Impact**: All embeddings in the system are from this model
+   - **Contract**: Model must always produce 768 dimensions
+
+2. **Embedding Dimension: 768**
+   - Enforced by LogicalForm.embedding validator
+   - **Impact**: Cannot change without full data migration
+   - **Breaking change if altered**: ALL stored LogicalForms become invalid
+
+3. **Normalization: L2 by Default**
+   - All embeddings are L2-normalized (unit vectors)
+   - Enables fast cosine similarity via dot product
+   - **Impact**: Similarity calculations assume normalized vectors
+   - **Contract**: `encode()` and `encode_batch()` normalize by default
+
+4. **Singleton Pattern**
+   - Model cached at class level
+   - Shared across all SemanticEncoder instances
+   - **Impact**: First encoding loads model, subsequent are fast
+   - **Memory**: ~420MB constant footprint per process
+
+5. **Integration Points**
+   - `add_embedding_to_form()`: Adds embedding to single LogicalForm
+   - `add_embeddings_to_forms()`: Batch adds embeddings
+   - **Contract**: Must accept LogicalForm objects, modify in-place
+
+6. **Dependencies Added**
+   - sentence-transformers ^5.1.2
+     - Pulls in: PyTorch, transformers, scikit-learn
+     - Total size: ~2GB of dependencies
+   - **Impact**: Installation is slower, production containers are larger
+
+### 🔗 Component Dependencies
+
+**SemanticEncoder depends on:**
+- `glcs.core.models.LogicalForm` (CRITICAL)
+  - Reads: `source_text` field
+  - Writes: `embedding` field
+- `numpy` (CRITICAL)
+  - Uses: Arrays for embeddings
+- `sentence-transformers` (CRITICAL)
+  - Uses: Model loading and encoding
+
+**Components that will depend on SemanticEncoder:**
+- **Memory Manager (Stage 1.2)**: Uses embeddings for vector storage
+- **Consistency Checker (Stage 1.3)**: Uses `cosine_similarity()` for semantic comparison
+- **Logical Parser (Stage 1.4)**: Calls `add_embedding_to_form()` after parsing
+- **API Layer (Stage 2.x)**: May expose encoding endpoints
+
+### ⚠️ Potential Cascade Effects
+
+#### If Model Changes (e.g., to different sentence-transformers model)
+**Impact**: CRITICAL - Data migration required
+
+**What breaks:**
+- Embedding dimensions may change (not 768 anymore)
+- LogicalForm validation rejects new embeddings
+- Existing embeddings incompatible with new ones
+- Cosine similarities between old/new embeddings are meaningless
+
+**Action needed:**
+1. **Update LogicalForm validator** to accept new dimension
+2. **Re-encode ALL existing LogicalForms**
+3. **Update vector database** to new dimension
+4. **Recompute all similarities**
+5. **Update documentation** with new model name
+6. **Test performance** (speed and accuracy may differ)
+
+**Recommendation**: Only change model if absolutely necessary. Treat as major version bump.
+
+#### If Embedding Dimension Changes
+**Impact**: CRITICAL - Breaking change
+
+**What breaks:**
+- LogicalForm.embedding validation fails
+- Vector database schema incompatible
+- Memory Manager storage layer breaks
+- All existing stored forms invalid
+
+**Action needed:**
+- This is a **breaking change** requiring full data wipe or migration
+- See "Migration Path for Breaking Changes" section
+
+#### If L2 Normalization is Removed
+**Impact**: HIGH - Breaks similarity calculations
+
+**What breaks:**
+- `cosine_similarity()` formula assumes normalized vectors
+- Dot product ≠ cosine similarity anymore
+- Consistency Checker results wrong
+- Need to use full cosine formula: `dot(a,b) / (norm(a) * norm(b))`
+
+**Action needed:**
+1. **Update `cosine_similarity()` method** to compute norms
+2. **Update vector database queries** (if using dot product)
+3. **Retest all similarity thresholds** (values may change)
+4. **Performance may degrade** (~2x slower similarity)
+
+**Recommendation**: Keep normalization. It's a standard practice.
+
+#### If `add_embedding_to_form()` Signature Changes
+**Impact**: MEDIUM - Breaks dependent components
+
+**Current signature:**
+```python
+def add_embedding_to_form(form: LogicalForm) -> LogicalForm
+```
+
+**If changed to** (example):
+```python
+def add_embedding_to_form(form: LogicalForm, model_name: str = "all-mpnet-base-v2") -> LogicalForm
+```
+
+**What breaks:**
+- Logical Parser calls (Stage 1.4)
+- API endpoints that use this method
+- Integration tests
+
+**Action needed:**
+- Make new parameters **optional** (backward compatible)
+- Deprecate old signature gradually
+- Update all call sites
+
+#### If Model Caching is Removed
+**Impact**: LOW - Performance only
+
+**What breaks:**
+- Nothing functionally
+- Each SemanticEncoder instance loads 420MB model
+- Memory usage increases (N encoders = N × 420MB)
+- Initialization slower (~5 seconds per encoder)
+
+**Recommendation**: Keep caching. No good reason to remove it.
+
+### 📊 Contracts Established
+
+#### Contract 1: Embedding Dimension = 768
+**Enforced by:** LogicalForm validator
+**Used by:** Memory Manager, Consistency Checker
+**Breaking change if violated:** Yes
+
+**Test verification:**
+```python
+# tests/unit/test_semantic_encoder.py::test_embedding_dimension_exactly_768
+# tests/unit/test_models.py::test_logical_form_with_valid_embedding
+```
+
+#### Contract 2: Model Returns Deterministic Results
+**Enforced by:** sentence-transformers library
+**Used by:** All components (for consistency)
+**Breaking change if violated:** Moderate
+
+**Test verification:**
+```python
+# tests/unit/test_semantic_encoder.py::test_encode_is_deterministic
+```
+
+#### Contract 3: Cosine Similarity Range [-1, 1]
+**Enforced by:** Mathematics, L2 normalization
+**Used by:** Consistency Checker
+**Breaking change if violated:** Yes
+
+**Test verification:**
+```python
+# tests/unit/test_semantic_encoder.py::test_cosine_similarity_range
+```
+
+#### Contract 4: Model Singleton Pattern
+**Enforced by:** Class-level `_model_cache`
+**Used by:** All SemanticEncoder instances
+**Breaking change if violated:** No (performance only)
+
+**Test verification:**
+```python
+# tests/unit/test_semantic_encoder.py::test_model_cache_reuses_model
+```
+
+#### Contract 5: Empty Text Rejection
+**Enforced by:** `encode()` validation
+**Used by:** All encoding operations
+**Breaking change if violated:** Moderate
+
+**Test verification:**
+```python
+# tests/unit/test_semantic_encoder.py::test_encode_empty_text_raises_error
+```
+
+### 🚨 High-Risk Changes
+
+**NEVER change these without full team review:**
+1. **Embedding dimension** (768) - CRITICAL
+2. **Model name** (all-mpnet-base-v2) - CRITICAL
+3. **Normalization** (L2) - HIGH
+4. **Method signatures** (`add_embedding_to_form`) - MEDIUM
+
+**Low-risk changes (safe to modify):**
+1. Model caching implementation
+2. Error messages
+3. Internal helper methods
+4. Docstrings
+
+### 🔄 Integration with Previous Stages
+
+**Stage 0.3 (Data Models) → Stage 1.1 (Semantic Encoder)**
+
+**Changes to Stage 0.3:**
+- ✅ Added `validate_assignment=True` to LogicalForm.model_config
+  - **Why**: Needed for embedding validation on field assignment
+  - **Impact**: LOW - More validation is good
+  - **Breaking**: No - Backward compatible
+
+**Python Version Change:**
+- ✅ Changed `python = "^3.11"` to `python = "^3.10"`
+- ✅ Changed `numpy = "^2.3.4"` to `numpy = "^1.26.0"`
+  - **Why**: User environment had Python 3.10.10
+  - **Impact**: LOW - NumPy 1.26 supports all our use cases
+  - **Breaking**: No - Only affects new installations
+
+---
+
 ## Stage Completion Status
 
 - ✅ **Stage 0.1**: Complete
-  - Dependencies: Poetry, Python 3.11, package structure
+  - Dependencies: Poetry, Python 3.10+, package structure
   - Contracts: Import paths, package name
   - Risk: Changing these is HIGH impact
 
@@ -1040,6 +1266,13 @@ If LogicalForm MUST change:
   - Risk: Model schema changes are CRITICAL impact
   - Test Coverage: 99% (42 tests passing)
 
+- ✅ **Stage 1.1**: Complete
+  - Dependencies: sentence-transformers (all-mpnet-base-v2), PyTorch
+  - Contracts: 768-dim embeddings, L2 normalization, model singleton, method signatures
+  - Risk: Model/dimension changes are CRITICAL, normalization changes HIGH
+  - Test Coverage: 97% (32 tests passing)
+  - Overall Coverage: 91% (111 tests total)
+
 ---
 
 ## Notes for Future Developers
@@ -1051,8 +1284,10 @@ If LogicalForm MUST change:
 5. **Test for cascade effects**: When changing core components, run FULL test suite
 6. **Document breaking changes**: Keep CHANGELOG.md updated
 7. **LogicalForm is the heart**: ALL components depend on it - changes cascade everywhere
+8. **Model choice is permanent**: Changing sentence-transformers model = data migration
+9. **Normalization matters**: L2 normalization enables fast similarity calculations
 
 ---
 
-**Last Review**: Stage 0.3 completion
-**Next Review**: After Stage 1.1 (Semantic Encoder)
+**Last Review**: Stage 1.1 completion
+**Next Review**: After Stage 1.2 (Memory Manager)

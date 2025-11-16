@@ -203,7 +203,10 @@ class LogicalForm(BaseModel):
     embedding: Optional[np.ndarray] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    model_config = ConfigDict(arbitrary_types_allowed=True)  # Allow numpy arrays
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,  # Allow numpy arrays
+        validate_assignment=True  # Run validators on field assignment
+    )
 
     @field_validator('embedding')
     @classmethod

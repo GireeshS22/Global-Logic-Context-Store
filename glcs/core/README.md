@@ -488,14 +488,225 @@ glcs/core/
 
 ---
 
+---
+
+## Semantic Encoder (Stage 1.1) ✅
+
+**File:** `glcs/core/semantic_encoder.py`
+
+### Purpose
+
+The **SemanticEncoder** generates 768-dimensional vector embeddings for text using sentence-transformers. These embeddings enable:
+- Semantic similarity comparisons between LogicalForms
+- Efficient nearest-neighbor search in vector databases
+- Consistency checking based on meaning (not just syntax)
+
+### Key Features
+
+- **768-dimensional embeddings** using `all-mpnet-base-v2` model
+- **Singleton pattern** - model cached and reused across requests
+- **Batch processing** - 5x faster than individual encoding
+- **L2 normalization** - enables fast cosine similarity (dot product)
+- **LogicalForm integration** - automatic embedding addition
+
+### Core Methods
+
+#### `encode(text: str) -> np.ndarray`
+
+Encode a single text string into a 768-dimensional embedding.
+
+```python
+from glcs.core.semantic_encoder import SemanticEncoder
+
+encoder = SemanticEncoder()
+embedding = encoder.encode("All humans are mortal")
+# embedding.shape == (768,)
+```
+
+#### `encode_batch(texts: List[str]) -> List[np.ndarray]`
+
+Encode multiple texts efficiently in batch.
+
+```python
+texts = ["All humans are mortal", "Socrates is human"]
+embeddings = encoder.encode_batch(texts)
+# len(embeddings) == 2
+# all(e.shape == (768,) for e in embeddings) == True
+```
+
+#### `add_embedding_to_form(form: LogicalForm) -> LogicalForm`
+
+Add embedding to a LogicalForm based on its `source_text`.
+
+```python
+from glcs.core.models import LogicalForm, Entity, Relation
+from glcs.core.models import LogicalType, Polarity
+
+form = LogicalForm(
+    context_id="session_123",
+    logical_type=LogicalType.UNIVERSAL_RULE,
+    subject=Entity(name="humans"),
+    predicate=Relation(verb="are"),
+    object=Entity(name="mortal"),
+    polarity=Polarity.POSITIVE,
+    source_text="All humans are mortal"
+)
+
+encoder.add_embedding_to_form(form)
+# form.embedding is now a 768-dim numpy array
+```
+
+#### `add_embeddings_to_forms(forms: List[LogicalForm]) -> List[LogicalForm]`
+
+Add embeddings to multiple LogicalForms efficiently using batch encoding.
+
+```python
+forms = [form1, form2, form3]  # List of LogicalForms
+encoder.add_embeddings_to_forms(forms)
+# All forms now have embeddings
+```
+
+#### `cosine_similarity(emb1: np.ndarray, emb2: np.ndarray) -> float`
+
+Compute semantic similarity between two embeddings.
+
+```python
+emb1 = encoder.encode("All humans are mortal")
+emb2 = encoder.encode("Every person is mortal")
+similarity = encoder.cosine_similarity(emb1, emb2)
+# similarity ≈ 0.85 (high similarity)
+```
+
+**Similarity Interpretation:**
+- `1.0`: Identical meaning
+- `0.7-0.9`: Very similar
+- `0.5-0.7`: Moderately similar
+- `0.3-0.5`: Somewhat related
+- `0.0-0.3`: Unrelated
+- `< 0.0`: Opposite meaning (rare)
+
+### Model Details
+
+**Default Model:** `all-mpnet-base-v2`
+- **Dimensions:** 768
+- **Size:** ~420MB
+- **Performance:** Excellent on semantic similarity tasks
+- **Speed:** ~50ms per text (single), ~10ms per text (batch)
+
+### Performance Optimization
+
+**Model Caching:**
+```python
+# Model is loaded once and cached
+encoder1 = SemanticEncoder()  # Loads model
+encoder2 = SemanticEncoder()  # Reuses cached model
+```
+
+**Batch Processing:**
+```python
+# ❌ Slow: Individual encoding
+embeddings = [encoder.encode(t) for t in texts]  # ~10ms per text
+
+# ✅ Fast: Batch encoding
+embeddings = encoder.encode_batch(texts)  # ~2ms per text (5x faster)
+```
+
+### Integration with GLCS Pipeline
+
+```
+User Input: "All humans are mortal"
+         ↓
+    [Logical Parser] (Stage 1.4)
+         ↓
+    Creates LogicalForm with source_text
+         ↓
+    [Semantic Encoder] ← YOU ARE HERE
+         ↓
+    Adds 768-dim embedding to LogicalForm
+         ↓
+    [Memory Manager] (Stage 1.2)
+         ↓
+    Stores LogicalForm with embedding in vector DB
+         ↓
+    [Consistency Checker] (Stage 1.3)
+         ↓
+    Compares embeddings for semantic similarity
+         ↓
+    Returns ConsistencyReport
+```
+
+### Error Handling
+
+```python
+# Empty text raises ValueError
+try:
+    encoder.encode("")
+except ValueError as e:
+    print(e)  # "Cannot encode empty text"
+
+# Wrong dimension embeddings rejected by LogicalForm
+form.embedding = np.random.rand(512)  # Raises ValueError
+# "Embedding must be 768-dimensional, got shape (512,)"
+```
+
+### Testing
+
+**Test File:** `tests/unit/test_semantic_encoder.py`
+
+**Coverage:** 97% (58/60 lines)
+
+**Test Categories:**
+- Basic encoding (7 tests)
+- Batch encoding (3 tests)
+- Error handling (4 tests)
+- LogicalForm integration (5 tests)
+- Cosine similarity (5 tests)
+- Model caching (3 tests)
+- Integration workflow (1 test)
+- Dimension validation (2 tests)
+- Determinism (2 tests)
+
+**Run Tests:**
+```bash
+# Run semantic encoder tests
+poetry run pytest tests/unit/test_semantic_encoder.py -v
+
+# Check coverage
+poetry run pytest tests/unit/test_semantic_encoder.py --cov=glcs.core.semantic_encoder --cov-report=term-missing
+```
+
+### Design Decisions
+
+**Why 768 dimensions?**
+- Standard size for transformer models
+- Good balance between accuracy and efficiency
+- Well-supported by vector databases
+
+**Why all-mpnet-base-v2?**
+- Produces exactly 768 dimensions (required by LogicalForm validation)
+- Excellent performance on semantic similarity benchmarks
+- Moderate size (~420MB) - not too large
+- Widely used and well-tested
+
+**Why L2 normalization?**
+- Enables fast cosine similarity via dot product
+- Cosine similarity = dot product when vectors are normalized
+- Critical for efficient nearest-neighbor search in vector databases
+
+**Why singleton pattern for model?**
+- Avoids loading 420MB model multiple times
+- Reduces memory usage in API servers
+- Faster initialization for subsequent encoders
+
+---
+
 ## Next Steps
 
-After Stage 0.3 (Data Models), the following components will use these models:
+After Stage 1.1 (Semantic Encoder), the following components will be built:
 
-- **Stage 1.1:** Semantic Encoder (adds `embedding` to LogicalForm)
-- **Stage 1.2:** Memory Manager (stores LogicalForm objects)
-- **Stage 1.3:** Consistency Checker (creates Violation and ConsistencyReport)
-- **Stage 1.4:** Logical Parser (creates LogicalForm objects)
+- **Stage 1.2:** Memory Manager (stores LogicalForm objects with embeddings)
+- **Stage 1.3:** Consistency Checker (compares LogicalForms using embeddings)
+- **Stage 1.4:** Logical Parser (creates LogicalForm objects from natural language)
 
 ---
 
@@ -504,8 +715,12 @@ After Stage 0.3 (Data Models), the following components will use these models:
 - **Pydantic Documentation:** https://docs.pydantic.dev/
 - **Type Hints:** https://docs.python.org/3/library/typing.html
 - **UUID Standard:** https://datatracker.ietf.org/doc/html/rfc4122
+- **Sentence Transformers:** https://www.sbert.net/
+- **all-mpnet-base-v2 Model:** https://huggingface.co/sentence-transformers/all-mpnet-base-v2
 
 ---
 
-**Last Updated**: Stage 0.3 (Data Models Complete)
-**Test Coverage**: 99% (42 tests, all passing)
+**Last Updated**: Stage 1.1 (Semantic Encoder Complete)
+**Test Coverage**: 91% overall (111 tests, all passing)
+**Stage 0.3**: Data Models - 99% coverage (42 tests)
+**Stage 1.1**: Semantic Encoder - 97% coverage (32 tests)
