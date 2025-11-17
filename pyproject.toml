@@ -1,134 +1,26 @@
 [tool.poetry]
 name = "glcs"
-version = "0.2.0"
-description = "Global Logical Context Store - Multi-provider logical contradiction detection for LLM conversations"
-authors = ["GLCS Team"]
-license = "MIT"
+version = "0.1.0"
+description = "Global Logical Context Store - Neuro-symbolic middleware for LLM consistency"
+authors = ["PhD Project"]
 readme = "README.md"
-homepage = "https://github.com/GireeshS22/Global-Logic-Context-Store"
-repository = "https://github.com/GireeshS22/Global-Logic-Context-Store"
-documentation = "https://github.com/GireeshS22/Global-Logic-Context-Store/tree/main/docs"
-keywords = [
-    "llm",
-    "logical-reasoning",
-    "contradiction-detection",
-    "openai",
-    "claude",
-    "gemini",
-    "ollama",
-    "ai",
-]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "Intended Audience :: Science/Research",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-    "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-]
-packages = [
-    { include = "glcs" }
-]
+packages = [{include = "glcs"}]
 
 [tool.poetry.dependencies]
 python = "^3.10"
-python-dotenv = "^1.0.0"
-pyyaml = "^6.0"
-pydantic = "^2.0.0"
-numpy = "^1.24.0"
-
-# Optional provider dependencies
-openai = { version = "^1.0.0", optional = true }
-anthropic = { version = "^0.7.0", optional = true }
-google-generativeai = { version = "^0.3.0", optional = true }
-groq = { version = "^0.4.0", optional = true }
-ollama = { version = "^0.1.0", optional = true }
+numpy = "^1.26.0"
+pydantic = "^2.12.4"
+python-dotenv = "^1.2.1"
+pyyaml = "^6.0.3"
+sentence-transformers = "^5.1.2"
+chromadb = "^0.5.20"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.4.0"
-pytest-cov = "^4.0.0"
-pytest-asyncio = "^0.21.0"
-black = "^23.0.0"
-ruff = "^0.1.0"
-mypy = "^1.0.0"
-
-[tool.poetry.group.ui]
-optional = true
-
-[tool.poetry.group.ui.dependencies]
-streamlit = "^1.28.0"
-plotly = "^5.0.0"
-
-[tool.poetry.extras]
-openai = ["openai"]
-anthropic = ["anthropic"]
-gemini = ["google-generativeai"]
-groq = ["groq"]
-ollama = ["ollama"]
-cloud-providers = ["openai", "anthropic", "google-generativeai", "groq"]
-all-providers = ["openai", "anthropic", "google-generativeai", "groq", "ollama"]
-all = ["openai", "anthropic", "google-generativeai", "groq", "ollama"]
+pytest = "^8.0.0"
+pytest-cov = "^4.1.0"
+black = "^24.0.0"
+ruff = "^0.3.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = "test_*.py"
-python_classes = "Test*"
-python_functions = "test_*"
-addopts = [
-    "-v",
-    "--strict-markers",
-    "--tb=short",
-]
-markers = [
-    "integration: Integration tests",
-    "unit: Unit tests",
-    "slow: Slow tests",
-    "requires_api_key: Tests that require API keys",
-]
-
-[tool.black]
-line-length = 100
-target-version = ["py310", "py311", "py312"]
-include = '\.pyi?$'
-exclude = '''
-/(
-    \.git
-  | \.venv
-  | build
-  | dist
-)/
-'''
-
-[tool.ruff]
-line-length = 100
-target-version = "py310"
-select = [
-    "E",  # pycodestyle errors
-    "W",  # pycodestyle warnings
-    "F",  # pyflakes
-    "I",  # isort
-    "B",  # flake8-bugbear
-    "C4",  # flake8-comprehensions
-]
-ignore = []
-exclude = [
-    ".git",
-    ".venv",
-    "build",
-    "dist",
-]
-
-[tool.mypy]
-python_version = "3.10"
-warn_return_any = true
-warn_unused_configs = true
-disallow_untyped_defs = false
-ignore_missing_imports = true
