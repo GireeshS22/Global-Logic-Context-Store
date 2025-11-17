@@ -1,0 +1,88 @@
+# GLCS Configuration File
+# Multi-Provider LLM Support Configuration
+
+# Default provider to use (if not specified in code)
+default_provider: openai
+
+# Provider Configurations
+# Note: API keys are loaded from environment variables for security
+providers:
+  # OpenAI Configuration
+  openai:
+    api_key: ${OPENAI_API_KEY}
+    model: gpt-4o-mini  # Options: gpt-4o, gpt-4o-mini, gpt-3.5-turbo
+    temperature: 0.7
+    max_tokens: 150
+    timeout: 30
+    # Cost: $0.06 per 1000 parses (gpt-4o-mini)
+    # Speed: Very Fast
+    # Quality: Excellent
+
+  # Anthropic Claude Configuration
+  anthropic:
+    api_key: ${ANTHROPIC_API_KEY}
+    model: claude-3-5-sonnet-20241022  # Options: claude-3-5-sonnet, claude-3-opus, claude-3-haiku
+    temperature: 0.7
+    max_tokens: 150
+    timeout: 30
+    # Cost: $0.08 per 1000 parses (claude-3-haiku)
+    # Speed: Fast
+    # Quality: Excellent
+
+  # Google Gemini Configuration
+  gemini:
+    api_key: ${GOOGLE_API_KEY}
+    model: gemini-1.5-flash  # Options: gemini-1.5-pro, gemini-1.5-flash
+    temperature: 0.7
+    max_tokens: 150
+    timeout: 30
+    # Cost: $0.04 per 1000 parses (gemini-1.5-flash)
+    # Speed: Very Fast
+    # Quality: Great
+
+  # Groq Configuration (Ultra-fast inference)
+  groq:
+    api_key: ${GROQ_API_KEY}
+    model: mixtral-8x7b-32768  # Options: mixtral-8x7b, llama-3.1-70b-versatile, llama-3.1-8b-instant
+    temperature: 0.7
+    max_tokens: 150
+    timeout: 30
+    # Cost: $0.27 per 1000 parses
+    # Speed: Ultra Fast (fastest available)
+    # Quality: Good
+
+  # Ollama Configuration (Local/Private - No API key needed!)
+  ollama:
+    # No API key needed - runs 100% locally
+    endpoint: http://localhost:11434
+    model: llama3.2  # Options: llama3.2, llama3.1, mistral, qwen2.5, phi3, gemma2
+    temperature: 0.7
+    max_tokens: 150
+    timeout: 60  # Higher timeout for local processing
+    # Cost: FREE (runs locally)
+    # Speed: Fast (depends on hardware)
+    # Quality: Good
+    # Privacy: 100% local - no data leaves your machine
+
+# Memory Configuration
+memory:
+  persist_path: glcs_memory.json
+  auto_save: true
+  max_statements: 10000  # Maximum statements to keep in memory
+
+# Logging Configuration
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  file: glcs.log
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  console: true  # Also log to console
+
+# Parser Configuration
+parser:
+  confidence_threshold: 0.5  # Minimum confidence for parsed statements
+  max_patterns: 50  # Maximum number of custom patterns
+
+# Checker Configuration
+checker:
+  strict_mode: false  # If true, reject statements with any violations
+  confidence_penalty: 0.2  # Confidence reduction per violation
