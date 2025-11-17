@@ -10,9 +10,18 @@ GLCS (Global Logical Context Store) is a neuro-symbolic middleware system design
 
 ## Key Features
 
+### 🎯 Stage 1.5 (Current) - Advanced LLM Parser
+- **LLM-Based Parsing**: Understands complex natural language using GPT-4, Claude, Gemini, or local Ollama
+- **768-Dimensional Embeddings**: Semantic similarity search using sentence transformers
+- **Vector Memory**: ChromaDB-powered storage with efficient similarity search
+- **Advanced Consistency Checking**: Detects contradictions using semantic similarity
+- **Multi-Provider Support**: Works with 5 LLM providers (Ollama, OpenAI, Anthropic, Gemini, Groq)
+- **Offline Mode**: 100% free local operation with Ollama
+
+### 🏗️ Architecture
 - **Real-time Consistency Checking**: Validates statements against stored logical memory
 - **Hierarchical Memory**: Organizes statements by logical type (Universal, Existential, Conditional, Ground)
-- **Model-Agnostic**: Works with any LLM API (OpenAI, Anthropic, Google)
+- **Model-Agnostic**: Works with any LLM API (OpenAI, Anthropic, Google, Groq, Ollama)
 - **Neuro-Symbolic Approach**: Combines vector embeddings with symbolic logical rules
 
 ## Installation
@@ -48,24 +57,52 @@ GLCS (Global Logical Context Store) is a neuro-symbolic middleware system design
 
 ## Quick Start
 
+### Advanced Mode (Stage 1.5) - Recommended
+
 ```python
-from glcs import GLCSManager
+from glcs.advanced_wrapper import AdvancedGLCS
 
-# Initialize GLCS
-glcs = GLCSManager()
-
-# Process a statement
-result = glcs.process_statement(
-    text="All employees work remotely",
-    context_id="conversation-123"
+# Initialize Advanced GLCS with Ollama (free, local)
+glcs = AdvancedGLCS(
+    parser_provider='ollama',  # Free local LLM
+    encoder_model='all-mpnet-base-v2',  # 768-dim embeddings
 )
 
-# Check consistency
-if result.is_consistent:
-    print("Statement is consistent!")
+# Process statements
+report = glcs.process_statement(
+    "All employees must complete training",
+    context_id="company-policies"
+)
+
+if report.is_consistent:
+    print("✓ Statement stored successfully")
 else:
-    print(f"Violations found: {result.violations}")
+    print("⚠️  Inconsistency detected:")
+    for violation in report.violations:
+        print(f"  - {violation.explanation}")
+
+# Search for similar statements
+similar = glcs.search_similar(
+    "Who needs training?",
+    context_id="company-policies",
+    top_k=5
+)
 ```
+
+### Simple Mode (Stage 1.4) - For Simple Use Cases
+
+```python
+from glcs import GLCSWrapper
+
+# Initialize with any provider
+wrapper = GLCSWrapper(provider='ollama', model='llama3.2')
+
+# Generate with consistency checking
+result = wrapper.generate("What is 2 + 2?")
+print(result['response'])
+```
+
+See `examples/advanced_glcs_demo.py` for complete examples!
 
 ## Project Structure
 
@@ -116,9 +153,16 @@ poetry run ruff check glcs/ tests/
 
 ## Documentation
 
-- [API Documentation](docs/API.md) - REST API reference
-- [Development Guide](docs/DEVELOPMENT.md) - Architecture and implementation details
-- [Evaluation Results](docs/EVALUATION.md) - Benchmarks and performance
+### Stage 1.5 (Advanced Implementation)
+- [LLM Parser Guide](docs/LLM_PARSER_GUIDE.md) - **NEW**: Complete guide to LLM-based parsing
+- [Provider Guide](docs/PROVIDER_GUIDE.md) - Multi-LLM provider comparison
+- [Ollama Setup](docs/OLLAMA_SETUP.md) - Free local LLM setup
+- [Core Components](glcs/core/README.md) - Architecture deep dive (1386 lines!)
+- [Utils Documentation](glcs/utils/README.md) - Configuration, logging, exceptions
+
+### General
+- [Testing Guide](tests/README.md) - How to run and write tests
+- [Configuration Guide](config/README.md) - YAML configuration reference
 
 ## Research
 

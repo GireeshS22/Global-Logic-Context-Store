@@ -37,15 +37,20 @@ encoder:
   # Cache embeddings to avoid recomputation
   cache_embeddings: true
 
-# Logical Parser Configuration
+# Logical Parser Configuration (Stage 1.5)
 parser:
-  # LLM provider for parsing (MVP uses LLM-as-Parser)
-  # Options: openai, anthropic, google (future)
-  llm_provider: "openai"
+  # LLM provider for parsing
+  # Options: ollama (local/free), openai, anthropic, gemini, groq
+  # Recommended: ollama for development, openai for production
+  llm_provider: "ollama"
 
   # Model to use for parsing
-  # OpenAI options: gpt-4o-mini (cheaper), gpt-4o, gpt-4-turbo
-  model: "gpt-4o-mini"
+  # Ollama: llama3.2 (default), llama3.1, mistral
+  # OpenAI: gpt-4o-mini (cheap), gpt-4o (accurate)
+  # Anthropic: claude-3-haiku (fast), claude-3-5-sonnet (accurate)
+  # Gemini: gemini-1.5-flash (cheap), gemini-1.5-pro (accurate)
+  # Groq: llama-3.1-70b-versatile (very fast)
+  model: "llama3.2"
 
   # Maximum retries on API failure
   max_retries: 3
@@ -53,8 +58,14 @@ parser:
   # Request timeout in seconds
   timeout: 30
 
-  # Enable caching of parsed results
+  # Enable caching of parsed results (saves API costs)
   cache_enabled: true
+
+  # Low temperature for consistent parsing
+  temperature: 0.1
+
+  # Maximum tokens for parser response
+  max_tokens: 300
 
 # Logging Configuration
 logging:
