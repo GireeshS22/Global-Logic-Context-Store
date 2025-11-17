@@ -1,0 +1,74 @@
+# GLCS Configuration File
+# Version: 0.1.0 (MVP)
+# This file contains all configurable parameters for the Global Logical Context Store
+
+# Memory Configuration
+memory:
+  # Vector dimension (must match encoder output)
+  # 768 for all-MiniLM-L6-v2, 384 for base models
+  vector_dimension: 768
+
+  # Similarity threshold for retrieving related statements
+  # Range: 0.0-1.0, higher = more similar required
+  similarity_threshold: 0.85
+
+  # Initial capacity hint for memory (can grow dynamically)
+  initial_capacity: 1000
+
+# Consistency Checking Configuration
+consistency:
+  # Threshold for direct contradiction detection
+  # Statements with similarity >= this are checked for contradiction
+  direct_contradiction_threshold: 0.85
+
+  # Minimum confidence to report a violation
+  # Range: 0.0-1.0, lower = more sensitive
+  confidence_threshold: 0.5
+
+# Semantic Encoder Configuration
+encoder:
+  # Sentence-transformer model name
+  # Options: all-MiniLM-L6-v2 (384-dim), all-mpnet-base-v2 (768-dim)
+  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+
+  # Batch size for encoding multiple statements
+  batch_size: 32
+
+  # Cache embeddings to avoid recomputation
+  cache_embeddings: true
+
+# Logical Parser Configuration
+parser:
+  # LLM provider for parsing (MVP uses LLM-as-Parser)
+  # Options: openai, anthropic, google (future)
+  llm_provider: "openai"
+
+  # Model to use for parsing
+  # OpenAI options: gpt-4o-mini (cheaper), gpt-4o, gpt-4-turbo
+  model: "gpt-4o-mini"
+
+  # Maximum retries on API failure
+  max_retries: 3
+
+  # Request timeout in seconds
+  timeout: 30
+
+  # Enable caching of parsed results
+  cache_enabled: true
+
+# Logging Configuration
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"
+
+  # Log format: simple (human-readable), json (structured)
+  format: "simple"
+
+  # Log file path (relative to project root)
+  log_file: "glcs.log"
+
+# Optional: Future Features (not yet implemented)
+# inference:
+#   enable_transitive_reasoning: false
+#   max_inference_depth: 3
+#   enable_causal_analysis: false

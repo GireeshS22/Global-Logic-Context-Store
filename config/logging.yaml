@@ -1,0 +1,74 @@
+# Python Logging Configuration
+# Format: Python logging.config.dictConfig schema
+# See: https://docs.python.org/3/library/logging.config.html
+
+version: 1
+disable_existing_loggers: false
+
+# Log message formatters
+formatters:
+  # Simple human-readable format for console
+  simple:
+    format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+  # Detailed format with module and line number
+  detailed:
+    format: '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+  # JSON format for structured logging (machine-readable)
+  json:
+    format: '{"time": "%(asctime)s", "name": "%(name)s", "level": "%(levelname)s", "message": "%(message)s"}'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+# Log handlers (where logs go)
+handlers:
+  # Console output (stdout)
+  console:
+    class: logging.StreamHandler
+    level: DEBUG
+    formatter: simple
+    stream: ext://sys.stdout
+
+  # File output (JSON format for parsing)
+  file:
+    class: logging.FileHandler
+    level: INFO
+    formatter: json
+    filename: glcs.log
+    mode: 'a'
+    encoding: utf-8
+
+  # Error file (only errors and above)
+  error_file:
+    class: logging.FileHandler
+    level: ERROR
+    formatter: detailed
+    filename: glcs_errors.log
+    mode: 'a'
+    encoding: utf-8
+
+# Logger configuration
+loggers:
+  # GLCS logger (for all glcs.* modules)
+  glcs:
+    level: DEBUG
+    handlers: [console, file, error_file]
+    propagate: false
+
+  # Specific module loggers (can override defaults)
+  glcs.core.consistency_checker:
+    level: DEBUG
+    handlers: [console, file]
+    propagate: false
+
+  glcs.core.memory_manager:
+    level: INFO
+    handlers: [console, file]
+    propagate: false
+
+# Root logger (catches everything else)
+root:
+  level: INFO
+  handlers: [console, file]
