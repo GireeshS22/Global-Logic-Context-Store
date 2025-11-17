@@ -1,19 +1,13 @@
-[build-system]
-requires = ["setuptools>=61.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
+[tool.poetry]
 name = "glcs"
 version = "0.2.0"
 description = "Global Logical Context Store - Multi-provider logical contradiction detection for LLM conversations"
+authors = ["GLCS Team"]
+license = "MIT"
 readme = "README.md"
-license = {text = "MIT"}
-authors = [
-    {name = "GLCS Team"}
-]
-maintainers = [
-    {name = "GLCS Team"}
-]
+homepage = "https://github.com/GireeshS22/Global-Logic-Context-Store"
+repository = "https://github.com/GireeshS22/Global-Logic-Context-Store"
+documentation = "https://github.com/GireeshS22/Global-Logic-Context-Store/tree/main/docs"
 keywords = [
     "llm",
     "logical-reasoning",
@@ -36,84 +30,52 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
-requires-python = ">=3.10"
-
-# Core dependencies (no LLM provider packages)
-dependencies = [
-    "python-dotenv>=1.0.0",
-    "pyyaml>=6.0",
-    "pydantic>=2.0.0",
-    "numpy>=1.24.0",
+packages = [
+    { include = "glcs" }
 ]
 
-[project.optional-dependencies]
-# Individual provider dependencies
-openai = ["openai>=1.0.0"]
-anthropic = ["anthropic>=0.7.0"]
-gemini = ["google-generativeai>=0.3.0"]
-groq = ["groq>=0.4.0"]
-ollama = ["ollama>=0.1.0"]
+[tool.poetry.dependencies]
+python = "^3.10"
+python-dotenv = "^1.0.0"
+pyyaml = "^6.0"
+pydantic = "^2.0.0"
+numpy = "^1.24.0"
 
-# Provider bundles
-cloud-providers = [
-    "openai>=1.0.0",
-    "anthropic>=0.7.0",
-    "google-generativeai>=0.3.0",
-    "groq>=0.4.0",
-]
+# Optional provider dependencies
+openai = { version = "^1.0.0", optional = true }
+anthropic = { version = "^0.7.0", optional = true }
+google-generativeai = { version = "^0.3.0", optional = true }
+groq = { version = "^0.4.0", optional = true }
+ollama = { version = "^0.1.0", optional = true }
 
-all-providers = [
-    "openai>=1.0.0",
-    "anthropic>=0.7.0",
-    "google-generativeai>=0.3.0",
-    "groq>=0.4.0",
-    "ollama>=0.1.0",
-]
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+pytest-cov = "^4.0.0"
+pytest-asyncio = "^0.21.0"
+black = "^23.0.0"
+ruff = "^0.1.0"
+mypy = "^1.0.0"
 
-# Development dependencies
-dev = [
-    "pytest>=7.4.0",
-    "pytest-cov>=4.0.0",
-    "pytest-asyncio>=0.21.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
-]
+[tool.poetry.group.ui]
+optional = true
 
-# Web UI dependencies
-ui = [
-    "streamlit>=1.28.0",
-    "plotly>=5.0.0",
-]
+[tool.poetry.group.ui.dependencies]
+streamlit = "^1.28.0"
+plotly = "^5.0.0"
 
-# All dependencies (for complete installation)
-all = [
-    "openai>=1.0.0",
-    "anthropic>=0.7.0",
-    "google-generativeai>=0.3.0",
-    "groq>=0.4.0",
-    "ollama>=0.1.0",
-    "pytest>=7.4.0",
-    "pytest-cov>=4.0.0",
-    "pytest-asyncio>=0.21.0",
-    "black>=23.0.0",
-    "ruff>=0.1.0",
-    "mypy>=1.0.0",
-    "streamlit>=1.28.0",
-    "plotly>=5.0.0",
-]
+[tool.poetry.extras]
+openai = ["openai"]
+anthropic = ["anthropic"]
+gemini = ["google-generativeai"]
+groq = ["groq"]
+ollama = ["ollama"]
+cloud-providers = ["openai", "anthropic", "google-generativeai", "groq"]
+all-providers = ["openai", "anthropic", "google-generativeai", "groq", "ollama"]
+all = ["openai", "anthropic", "google-generativeai", "groq", "ollama"]
 
-[project.urls]
-Homepage = "https://github.com/GireeshS22/Global-Logic-Context-Store"
-Documentation = "https://github.com/GireeshS22/Global-Logic-Context-Store/tree/main/docs"
-Repository = "https://github.com/GireeshS22/Global-Logic-Context-Store"
-Issues = "https://github.com/GireeshS22/Global-Logic-Context-Store/issues"
-
-[tool.setuptools]
-packages = ["glcs", "glcs.providers"]
-
-[tool.setuptools.package-data]
-glcs = ["py.typed"]
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -124,9 +86,6 @@ addopts = [
     "-v",
     "--strict-markers",
     "--tb=short",
-    "--cov=glcs",
-    "--cov-report=term-missing",
-    "--cov-report=html",
 ]
 markers = [
     "integration: Integration tests",

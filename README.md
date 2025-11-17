@@ -31,9 +31,9 @@ git clone https://github.com/GireeshS22/Global-Logic-Context-Store.git
 cd Global-Logic-Context-Store
 
 # Install with your preferred provider(s)
-pip install -e ".[openai]"      # OpenAI only
-pip install -e ".[ollama]"      # Ollama only (FREE!)
-pip install -e ".[all-providers]"  # All providers
+poetry install -E openai          # OpenAI only
+poetry install -E ollama          # Ollama only (FREE!)
+poetry install -E all-providers   # All providers
 ```
 
 ### Basic Usage
@@ -104,25 +104,25 @@ wrapper = GLCSWrapper(provider='gemini', model='gemini-1.5-flash')
 
 ```bash
 # OpenAI only
-pip install -e ".[openai]"
+poetry install -E openai
 
 # Anthropic Claude only
-pip install -e ".[anthropic]"
+poetry install -E anthropic
 
 # Google Gemini only
-pip install -e ".[gemini]"
+poetry install -E gemini
 
 # Groq only
-pip install -e ".[groq]"
+poetry install -E groq
 
 # Ollama only (FREE, local)
-pip install -e ".[ollama]"
+poetry install -E ollama
 
 # All cloud providers
-pip install -e ".[cloud-providers]"
+poetry install -E cloud-providers
 
 # Everything (all providers + dev tools)
-pip install -e ".[all]"
+poetry install -E all
 ```
 
 ## 🔧 Configuration
@@ -262,7 +262,7 @@ Based on evaluation framework (17 test cases):
 
 ```bash
 # Install dev dependencies
-pip install -e ".[dev]"
+poetry install -E dev
 
 # Run all tests
 pytest
@@ -361,7 +361,7 @@ A: Ollama is FREE. For cloud, Gemini 1.5 Flash is cheapest at $0.04 per 1K parse
 
 1. **Install GLCS:**
    ```bash
-   pip install -e ".[ollama]"  # Start with FREE Ollama
+   poetry install -E ollama  # Start with FREE Ollama
    ```
 
 2. **Set up Ollama (optional but recommended for free usage):**
