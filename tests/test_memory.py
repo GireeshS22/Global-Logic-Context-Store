@@ -6,7 +6,7 @@ import pytest
 import os
 import tempfile
 from glcs.memory import SimpleMemory
-from glcs.core import LogicalStatement, LogicalType
+from glcs.simple_models import LogicalStatement, LogicalType
 
 
 class TestSimpleMemory:

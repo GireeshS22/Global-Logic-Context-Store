@@ -68,9 +68,27 @@ class OllamaProvider(LLMProvider):
             models = self._client.list()
 
             # Check if our model is available
-            available_models = [m['name'].split(':')[0] for m in models.get('models', [])]
+            # Get full model names (with version tags like :0.5b)
+            # Handle both dict and object formats for compatibility
+            model_list = models.get('models', []) if isinstance(models, dict) else getattr(models, 'models', [])
 
-            if self.config.model not in available_models:
+            available_models = []
+            for m in model_list:
+                # Support both dict access (old API) and attribute access (new API)
+                name = m.get('name') if isinstance(m, dict) else getattr(m, 'model', getattr(m, 'name', None))
+                if name:
+                    available_models.append(name)
+
+            # Also create list of base names (without version) for fallback checking
+            available_base_models = [name.split(':')[0] for name in available_models]
+
+            # Check both full name and base name
+            model_available = (
+                self.config.model in available_models or
+                self.config.model.split(':')[0] in available_base_models
+            )
+
+            if not model_available:
                 # Model not available - try to pull it
                 print(f"Model '{self.config.model}' not found locally. Attempting to pull...")
                 try:
@@ -203,7 +221,17 @@ class OllamaProvider(LLMProvider):
         """
         try:
             models = self._client.list()
-            return [m['name'] for m in models.get('models', [])]
+            # Handle both dict and object formats for compatibility
+            model_list = models.get('models', []) if isinstance(models, dict) else getattr(models, 'models', [])
+
+            available_models = []
+            for m in model_list:
+                # Support both dict access (old API) and attribute access (new API)
+                name = m.get('name') if isinstance(m, dict) else getattr(m, 'model', getattr(m, 'name', None))
+                if name:
+                    available_models.append(name)
+
+            return available_models
         except Exception as e:
             raise ProviderAPIError(f"Error listing Ollama models: {e}")
 

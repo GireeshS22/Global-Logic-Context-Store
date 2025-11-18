@@ -3,7 +3,7 @@ Consistency checking logic for logical statements.
 """
 
 from typing import List, Tuple, Optional
-from glcs.core import LogicalStatement, LogicalType
+from glcs.simple_models import LogicalStatement, LogicalType
 from glcs.memory import SimpleMemory
 
 

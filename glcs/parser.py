@@ -4,7 +4,7 @@ Simple rule-based parser for extracting logical statements from text.
 
 import re
 from typing import Optional, List
-from glcs.core import LogicalStatement, LogicalType
+from glcs.simple_models import LogicalStatement, LogicalType
 
 
 class SimpleParser:

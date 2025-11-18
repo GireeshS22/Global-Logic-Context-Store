@@ -8,7 +8,7 @@ import os
 from glcs.parser import SimpleParser
 from glcs.memory import SimpleMemory
 from glcs.checker import ConsistencyChecker
-from glcs.core import LogicalType, LogicalStatement
+from glcs.simple_models import LogicalType, LogicalStatement
 
 
 class TestIntegration:
