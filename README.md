@@ -1,6 +1,6 @@
 # GLCS - Global Logical Context Store
 
-**Version**: 0.1.0 (MVP)
+**Version**: 2.1.0 (Stage 2.1 - REST API)
 **Status**: Development
 **License**: MIT
 
@@ -103,6 +103,54 @@ print(result['response'])
 ```
 
 See `examples/advanced_glcs_demo.py` for complete examples!
+
+## REST API (Stage 2.1) 🚀 NEW!
+
+GLCS now provides a production-ready REST API for remote access:
+
+### Quick API Start
+
+```bash
+# 1. Start the API server
+poetry run uvicorn glcs.api.app:app --reload
+
+# 2. Open interactive docs
+# Browser: http://localhost:8000/docs
+```
+
+### API Examples
+
+```bash
+# Parse a statement
+curl -X POST http://localhost:8000/api/v1/parse \
+  -H "Content-Type: application/json" \
+  -d '{"text": "John is a manager", "context_id": "team-db"}'
+
+# Check consistency
+curl -X POST http://localhost:8000/api/v1/check \
+  -H "Content-Type: application/json" \
+  -d '{"text": "John is a developer", "context_id": "team-db"}'
+
+# Semantic search
+curl "http://localhost:8000/api/v1/search?query=managers&context_id=team-db"
+```
+
+### Python Client Example
+
+```python
+import requests
+
+# Parse statement via API
+response = requests.post('http://localhost:8000/api/v1/parse', json={
+    'text': 'All managers must approve budgets',
+    'context_id': 'company-policies'
+})
+result = response.json()
+print(f"Parsed as: {result['logical_type']}")
+print(f"Confidence: {result['confidence_score']}")
+```
+
+**Full API Documentation:** [docs/API_GUIDE.md](docs/API_GUIDE.md)
 
 ## Project Structure
 
