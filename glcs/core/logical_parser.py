@@ -338,11 +338,31 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
         Raises:
             ValidationError: If data is invalid or incomplete
         """
-        # Required fields
-        required_fields = ['subject', 'predicate', 'logical_type', 'polarity', 'confidence']
-        for field in required_fields:
-            if field not in data:
-                raise ValidationError(f"Missing required field: {field}")
+        # Check essential fields first (subject and predicate are truly required)
+        if 'subject' not in data:
+            raise ValidationError(f"Missing required field: subject")
+        if 'predicate' not in data:
+            raise ValidationError(f"Missing required field: predicate")
+
+        # Add intelligent defaults for missing optional fields
+        # This helps with smaller models that may not always include all fields
+        if 'logical_type' not in data:
+            # Infer logical type from statement structure
+            if data.get('object') is None:
+                data['logical_type'] = 'ground_fact'  # Simple assertion
+            else:
+                data['logical_type'] = 'ground_fact'  # Default to ground fact
+            logger.debug(f"Inferred logical_type: {data['logical_type']}")
+
+        if 'polarity' not in data:
+            # Default to positive unless we can detect negation
+            data['polarity'] = 'positive'
+            logger.debug(f"Defaulted polarity to: positive")
+
+        if 'confidence' not in data:
+            # Default to medium confidence
+            data['confidence'] = 0.7
+            logger.debug(f"Defaulted confidence to: 0.7")
 
         # Validate logical_type
         valid_types = ['universal_rule', 'existential_claim', 'conditional_logic', 'ground_fact']
