@@ -65,7 +65,7 @@ class LLMLogicalParser:
         timeout: Request timeout in seconds
 
     Example:
-        >>> parser = LLMLogicalParser(provider='ollama', model='llama3.2')
+        >>> parser = LLMLogicalParser(provider='ollama', model='qwen2.5:0.5b')
         >>> form = parser.parse("All employees must complete training", "ctx-123")
         >>> print(form.logical_type)  # LogicalType.UNIVERSAL_RULE
         >>> print(form.subject.name)  # "employees"
@@ -129,7 +129,7 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
         Args:
             provider: Provider name ('ollama', 'openai', 'anthropic', 'gemini', 'groq')
                      Default: 'ollama' (free, local, offline)
-            model: Model name (e.g., 'llama3.2', 'gpt-4o-mini', 'claude-3-haiku')
+            model: Model name (e.g., 'qwen2.5:0.5b', 'gpt-4o-mini', 'claude-3-haiku')
             api_key: API key for cloud providers (not needed for Ollama)
             config: Additional provider configuration
             cache_enabled: Enable in-memory caching of parsed results
@@ -175,15 +175,15 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
             raise ProviderError(f"Parser initialization failed: {e}")
 
     def _get_default_model(self, provider_name: str) -> str:
-        """Get default model for each provider (optimized for accuracy)."""
+        """Get default model for each provider (optimized for speed and size)."""
         defaults = {
-            'ollama': 'llama3.2',
+            'ollama': 'qwen2.5:0.5b',
             'openai': 'gpt-4o-mini',
             'anthropic': 'claude-3-5-sonnet-20241022',
             'gemini': 'gemini-1.5-flash',
             'groq': 'llama-3.1-70b-versatile',
         }
-        return defaults.get(provider_name, 'llama3.2')
+        return defaults.get(provider_name, 'qwen2.5:0.5b')
 
     def _get_cache_key(self, text: str) -> str:
         """Generate cache key from text."""
