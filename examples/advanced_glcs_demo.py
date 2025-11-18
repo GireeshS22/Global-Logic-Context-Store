@@ -340,7 +340,7 @@ def main():
 
     print("\n⚠️  Prerequisites:")
     print("  • Ollama must be running (ollama serve)")
-    print("  • Model installed (ollama pull llama3.2)")
+    print("  • Model installed (ollama pull qwen2.5:0.5b)")
     print("  • ChromaDB installed (included in dependencies)")
 
     input("\nPress Enter to start the demo...")
@@ -396,7 +396,7 @@ def main():
         print(f"\n\n❌ Demo failed: {e}")
         print("\nTroubleshooting:")
         print("  • Make sure Ollama is running: ollama serve")
-        print("  • Check model is installed: ollama pull llama3.2")
+        print("  • Check model is installed: ollama pull qwen2.5:0.5b")
         print("  • Verify dependencies: poetry install")
         print("  • See docs/LLM_PARSER_GUIDE.md for help")
 

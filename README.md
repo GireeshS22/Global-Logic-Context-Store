@@ -95,7 +95,7 @@ similar = glcs.search_similar(
 from glcs import GLCSWrapper
 
 # Initialize with any provider
-wrapper = GLCSWrapper(provider='ollama', model='llama3.2')
+wrapper = GLCSWrapper(provider='ollama', model='qwen2.5:0.5b')
 
 # Generate with consistency checking
 result = wrapper.generate("What is 2 + 2?")

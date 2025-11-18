@@ -124,7 +124,7 @@ poetry run python examples/advanced_glcs_demo.py
 
 ### Prerequisites
 - Ollama running: `ollama serve`
-- Model pulled: `ollama pull llama3.2`
+- Model pulled: `ollama pull qwen2.5:0.5b`
 - All dependencies installed: `poetry install`
 
 ---

@@ -45,12 +45,12 @@ parser:
   llm_provider: "ollama"
 
   # Model to use for parsing
-  # Ollama: llama3.2 (default), llama3.1, mistral
+  # Ollama: qwen2.5:0.5b (tiny, fast), llama3.2, llama3.1, mistral
   # OpenAI: gpt-4o-mini (cheap), gpt-4o (accurate)
   # Anthropic: claude-3-haiku (fast), claude-3-5-sonnet (accurate)
   # Gemini: gemini-1.5-flash (cheap), gemini-1.5-pro (accurate)
   # Groq: llama-3.1-70b-versatile (very fast)
-  model: "llama3.2"
+  model: "qwen2.5:0.5b"
 
   # Maximum retries on API failure
   max_retries: 3

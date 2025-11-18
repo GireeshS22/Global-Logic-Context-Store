@@ -186,7 +186,7 @@ def demo_provider_comparison():
     print(f"\n📝 Parsing: '{statement}'")
 
     providers = [
-        ('ollama', 'llama3.2'),
+        ('ollama', 'qwen2.5:0.5b'),
         # Uncomment if you have API keys:
         # ('openai', 'gpt-4o-mini'),
         # ('anthropic', 'claude-3-haiku'),
@@ -294,7 +294,7 @@ def main():
         print(f"\n\n❌ Demo failed: {e}")
         print("\nTroubleshooting:")
         print("  • Make sure Ollama is running: ollama serve")
-        print("  • Check that llama3.2 model is installed: ollama pull llama3.2")
+        print("  • Check that qwen2.5:0.5b model is installed: ollama pull qwen2.5:0.5b")
         print("  • See docs/LLM_PARSER_GUIDE.md for more help")
 
 
