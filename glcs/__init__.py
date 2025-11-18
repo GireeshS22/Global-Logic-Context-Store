@@ -4,7 +4,8 @@ A practical tool for detecting logical contradictions in LLM conversations.
 """
 
 # Simple implementation (Stage 1.4) - import from modules directly
-from glcs.parser import SimpleParser, LogicalStatement, LogicalType
+from glcs.simple_models import LogicalStatement, LogicalType
+from glcs.parser import SimpleParser
 from glcs.memory import SimpleMemory
 from glcs.checker import ConsistencyChecker
 from glcs.llm_wrapper import GLCSWrapper

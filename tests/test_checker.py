@@ -7,7 +7,7 @@ import tempfile
 import os
 from glcs.checker import ConsistencyChecker
 from glcs.memory import SimpleMemory
-from glcs.core import LogicalStatement, LogicalType
+from glcs.simple_models import LogicalStatement, LogicalType
 
 
 class TestConsistencyChecker:

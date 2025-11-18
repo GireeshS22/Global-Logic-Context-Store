@@ -4,7 +4,7 @@ Tests for the SimpleParser component
 
 import pytest
 from glcs.parser import SimpleParser
-from glcs.core import LogicalType
+from glcs.simple_models import LogicalType
 
 
 class TestSimpleParser:

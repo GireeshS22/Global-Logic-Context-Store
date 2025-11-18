@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from glcs.parser import SimpleParser
 from glcs.memory import SimpleMemory
 from glcs.checker import ConsistencyChecker
-from glcs.core import LogicalStatement, LogicalType
+from glcs.simple_models import LogicalStatement, LogicalType
 from glcs.providers import (
     LLMProvider,
     ProviderConfig,

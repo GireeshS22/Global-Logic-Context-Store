@@ -4,7 +4,7 @@ Simple dictionary-based memory store for logical statements.
 
 from typing import Dict, List, Optional
 from collections import defaultdict
-from glcs.core import LogicalStatement, LogicalType
+from glcs.simple_models import LogicalStatement, LogicalType
 import json
 import os
 
