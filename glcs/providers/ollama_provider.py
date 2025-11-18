@@ -68,9 +68,19 @@ class OllamaProvider(LLMProvider):
             models = self._client.list()
 
             # Check if our model is available
-            available_models = [m['name'].split(':')[0] for m in models.get('models', [])]
+            # Get full model names (with version tags like :0.5b)
+            available_models = [m['name'] for m in models.get('models', [])]
 
-            if self.config.model not in available_models:
+            # Also create list of base names (without version) for fallback checking
+            available_base_models = [m['name'].split(':')[0] for m in models.get('models', [])]
+
+            # Check both full name and base name
+            model_available = (
+                self.config.model in available_models or
+                self.config.model.split(':')[0] in available_base_models
+            )
+
+            if not model_available:
                 # Model not available - try to pull it
                 print(f"Model '{self.config.model}' not found locally. Attempting to pull...")
                 try:
