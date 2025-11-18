@@ -247,7 +247,7 @@ def check_consistency(request: CheckRequest):
         response = ConsistencyReportResponse(
             is_consistent=report.is_consistent,
             violations=violations,
-            form=_logical_form_to_response(report.new_form) if report.new_form else None,
+            form=None,  # Parsed form not returned in consistency report
             checked_at=datetime.utcnow()
         )
 
