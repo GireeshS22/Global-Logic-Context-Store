@@ -108,8 +108,8 @@ class AdvancedGLCS:
         # Initialize Consistency Checker
         logger.info("Initializing consistency checker")
         self.checker = ConsistencyChecker(
-            memory_manager=self.memory,
-            semantic_encoder=self.encoder,
+            self.memory,
+            self.encoder,
         )
 
         logger.info("Advanced GLCS system initialized successfully")
