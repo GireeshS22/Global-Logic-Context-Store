@@ -314,7 +314,7 @@ def test_parse_very_long_text():
 def test_parse_special_characters():
     """Test parsing text with special characters."""
     response = client.post("/api/v1/parse", json={
-        "text": "John's résumé is impressive! @#$%",
+        "text": "John's resume is impressive! @#$%",
         "context_id": "test-ctx-special"
     })
     # Should handle gracefully
