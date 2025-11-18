@@ -306,6 +306,9 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
                 max_tokens=300,
             )
 
+            # DEBUG: Log raw LLM response for debugging
+            logger.debug(f"Raw LLM response (first 500 chars): {response_text[:500]}")
+
             # Parse JSON response
             # Remove markdown code blocks if present
             response_text = response_text.strip()
@@ -314,7 +317,10 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
                 lines = response_text.split('\n')
                 response_text = '\n'.join(lines[1:-1])  # Remove first and last line
 
+            logger.debug(f"Cleaned response for JSON parsing: {response_text[:500]}")
+
             extracted_data = json.loads(response_text)
+            logger.debug(f"Parsed JSON keys: {list(extracted_data.keys())}")
             return extracted_data
 
         except json.JSONDecodeError as e:
