@@ -50,9 +50,9 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | # | Issue | Details |
 |---|-------|---------|
-| 8 | Delete `nul` file | Accidental Windows artifact in repo root (54 bytes of error text). |
-| 9 | Fix `.gitignore` — missing entries | Add: `chroma_db/`, `*.json` at root level, `data/*.jsonl`. Currently `demo_memory.json`, `glcs_memory.json`, `streamlit_memory.json` and `data/test.jsonl` are at risk of accidental commit. |
-| 10 | Track `poetry.lock` | Currently in `.gitignore`. Collaborators cannot get reproducible builds without it. Remove `poetry.lock` from `.gitignore` and commit it. |
+| 8 | ~~Delete `nul` file~~ | **FIXED** Deleted from repo root. |
+| 9 | ~~Fix `.gitignore` — missing entries~~ | **FIXED** Added `chroma_db/`, `/*.json`, `data/*.jsonl`, `.streamlit/`. |
+| 10 | ~~Track `poetry.lock`~~ | **FIXED** Removed `poetry.lock` from `.gitignore`. Now tracked for reproducible builds. |
 
 ---
 
@@ -206,7 +206,7 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | Tier | Total | Fixed | Remaining |
 |------|-------|-------|-----------|
-| Tier 1: Critical | 10 | 7 | 3 |
+| Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 0 | 10 |
 | Tier 3: Engineering Quality | 63 | 0 | 63 |
 | **Total** | **83** | **0** | **83** |
