@@ -33,9 +33,9 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 1 | Raw script crashes entire test suite | `tests/unit/test_providers/test_ollama.py` | Not a test file. Instantiates `GLCSWrapper` at module level requiring a running Ollama server. Blocks all 311 tests from running. Delete or move out of `tests/`. |
-| 2 | Raw script in test directory | `tests/unit/gs_unittest.py` | Manual script, not a test. No test functions. Remove from `tests/`. |
-| 3 | Raw script in test directory | `tests/unit/test_full_pipeline.py` | Manual script, no test functions. Would crash on collection. Remove from `tests/`. |
+| 1 | ~~Raw script crashes entire test suite~~ | ~~`tests/unit/test_providers/test_ollama.py`~~ | **FIXED** Moved to `examples/ollama_wrapper_demo.py`. |
+| 2 | ~~Raw script in test directory~~ | ~~`tests/unit/gs_unittest.py`~~ | **FIXED** Moved to `examples/parser_manual_test.py`. |
+| 3 | ~~Raw script in test directory~~ | ~~`tests/unit/test_full_pipeline.py`~~ | **FIXED** Moved to `examples/full_pipeline_demo.py`. |
 
 ### 1.2 API Endpoints That Crash at Runtime
 
@@ -206,7 +206,7 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | Tier | Total | Fixed | Remaining |
 |------|-------|-------|-----------|
-| Tier 1: Critical | 10 | 0 | 10 |
+| Tier 1: Critical | 10 | 3 | 7 |
 | Tier 2: Data Integrity | 10 | 0 | 10 |
 | Tier 3: Engineering Quality | 63 | 0 | 63 |
 | **Total** | **83** | **0** | **83** |
