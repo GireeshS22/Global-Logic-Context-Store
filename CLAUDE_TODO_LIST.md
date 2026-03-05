@@ -41,10 +41,10 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 4 | `/search` endpoint crashes | `glcs/api/routes.py:300-308` | `search_similar()` returns `List[LogicalForm]` but route unpacks `(form, score)` tuples. Guaranteed `ValueError`. |
-| 5 | `/contexts` endpoint crashes | `glcs/api/routes.py:350` | Calls `glcs.list_contexts()` which does not exist on `AdvancedGLCS`. Guaranteed `AttributeError`. |
-| 6 | `/check` endpoint mutates state | `glcs/api/routes.py:234` | Calls `process_statement(auto_store=True)`, so a read-only check endpoint silently stores data. Should pass `auto_store=False`. |
-| 7 | CORS misconfiguration | `glcs/api/app.py:144-150` | `allow_origins=["*"]` + `allow_credentials=True` is prohibited by CORS spec. Browsers reject credentialed requests with wildcard origin. |
+| 4 | ~~`/search` endpoint crashes~~ | ~~`glcs/api/routes.py:300-308`~~ | **FIXED** `for form in results` — `search_similar()` returns `List[LogicalForm]`, not tuples. |
+| 5 | ~~`/contexts` endpoint crashes~~ | ~~`glcs/api/routes.py:350`~~ | **FIXED** Changed to `glcs.memory.list_contexts()` which exists on `MemoryManager`. |
+| 6 | ~~`/check` endpoint mutates state~~ | ~~`glcs/api/routes.py:234`~~ | **FIXED** Now passes `auto_store=False` to `process_statement`. |
+| 7 | ~~CORS misconfiguration~~ | ~~`glcs/api/app.py:144-150`~~ | **FIXED** `allow_credentials` now only `True` when `GLCS_CORS_ORIGINS` env var specifies explicit origins. |
 
 ### 1.3 Repository Hygiene
 
@@ -206,7 +206,7 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | Tier | Total | Fixed | Remaining |
 |------|-------|-------|-----------|
-| Tier 1: Critical | 10 | 3 | 7 |
+| Tier 1: Critical | 10 | 7 | 3 |
 | Tier 2: Data Integrity | 10 | 0 | 10 |
 | Tier 3: Engineering Quality | 63 | 0 | 63 |
 | **Total** | **83** | **0** | **83** |

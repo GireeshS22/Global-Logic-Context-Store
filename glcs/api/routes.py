@@ -231,7 +231,7 @@ def check_consistency(request: CheckRequest):
             )
 
         # Process and check statement
-        report = glcs.process_statement(request.text, request.context_id)
+        report = glcs.process_statement(request.text, request.context_id, auto_store=False)
 
         # Convert violations
         violations = [
@@ -303,9 +303,9 @@ def search_knowledge(
         search_results = [
             SearchResult(
                 form=_logical_form_to_response(form),
-                similarity_score=score
+                similarity_score=1.0  # search_similar returns ranked forms, no score exposed
             )
-            for form, score in results
+            for form in results
         ]
 
         response = SearchResponse(
@@ -347,7 +347,7 @@ def list_contexts():
             )
 
         # Get all contexts
-        context_ids = glcs.list_contexts()
+        context_ids = glcs.memory.list_contexts()
 
         # Get summary for each context
         contexts = []

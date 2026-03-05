@@ -140,11 +140,15 @@ app = FastAPI(
 # Middleware
 # ============================================================================
 
-# CORS middleware - Allow all origins in development
+# CORS middleware
+# allow_origins=["*"] is incompatible with allow_credentials=True per the CORS spec.
+# Credentials (cookies, Authorization headers) require explicit origin allowlisting.
+_cors_origins = os.getenv("GLCS_CORS_ORIGINS", "").split(",")
+_allow_origins = [o.strip() for o in _cors_origins if o.strip()] or ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
-    allow_credentials=True,
+    allow_origins=_allow_origins,
+    allow_credentials=_allow_origins != ["*"],  # only True when origins are explicit
     allow_methods=["*"],
     allow_headers=["*"],
 )
