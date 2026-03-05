@@ -1,143 +1,217 @@
-# GLCS PhD Project - TODO List
+# GLCS Project Audit — Issues & Fix List
 
 **Project:** Global Logical Context Store (GLCS)
-**Purpose:** Neuro-symbolic middleware for LLM consistency checking
-**Last Updated:** 2025-11-18
+**Audit Date:** 2026-03-05
+**Status:** Pre-collaborator onboarding cleanup
 
 ---
 
-## Progress Summary
+## Component Audit Status
 
-| Stage | Status | Tests | Coverage |
-|-------|--------|-------|----------|
-| 0.1: Project Structure | ✅ Complete | N/A | N/A |
-| 0.2: Configuration | ✅ Complete | 37 | 79-100% |
-| 0.3: Data Models | ✅ Complete | 42 | 99% |
-| 1.1: Semantic Encoder | ✅ Complete | 32 | 97% |
-| 1.2: Memory Manager | ✅ Complete | 29 | 84% |
-| 1.3: Consistency Checker | ✅ Complete | 18 | 86% |
-| 1.4: Multi-Provider Support | ✅ Complete | - | High |
-| **1.5: LLM Parser** | **✅ Complete** | **60** | **High** |
-| 2.1: REST API | ⏳ Pending | - | - |
-| 2.2: WebSocket | ⏳ Pending | - | - |
+Carried forward from original audit. Tracks which components have been verified.
 
-**Overall Progress:** 8/17 stages complete (47%)
-**Total Tests Passing:** 171+ tests  
-**Overall Coverage:** ~88%
-
----
-
-## Stage 1.5: LLM-Based Logical Parser ✅ **COMPLETED**
-
-### Implementation Summary
-
-**Files Created:**
-- `glcs/core/logical_parser.py` (650 lines) - LLM-based parser
-- `glcs/advanced_wrapper.py` (380 lines) - Full pipeline wrapper
-- `tests/unit/test_llm_parser.py` (45 tests)
-- `tests/integration/test_advanced_glcs.py` (15 tests)
-- `docs/LLM_PARSER_GUIDE.md` (600 lines)
-- `examples/llm_parser_demo.py` (8 interactive demos)
-- `examples/advanced_glcs_demo.py` (10 scenarios)
-
-**Files Fixed:**
-- Renamed `glcs/core.py` → `glcs/simple_models.py` (resolved import conflict)
-- Updated `glcs/__init__.py`, `glcs/parser.py`, `glcs/memory.py`, `glcs/checker.py`, `glcs/llm_wrapper.py`
-- Updated all test imports
-- Fixed `GLCSMemoryError` → `MemoryError` in advanced_wrapper.py
-
-**Key Features:**
-✅ Multi-provider support (Ollama, OpenAI, Anthropic, Gemini, Groq)  
-✅ 768-dimensional semantic embeddings  
-✅ Handles complex sentences that regex parsers cannot  
-✅ 100% offline mode with Ollama (free, local)  
-✅ MD5-based caching for API cost reduction  
-✅ Exponential backoff retry logic  
-✅ Batch processing support  
-✅ Entity and relation extraction  
-✅ Logical type classification  
-✅ Polarity detection  
-✅ Confidence scoring  
-
-**Branch:** `claude/pull-develop-updates-01CZod2oW7k91HHJRMLqNMY2`
-
-**Commits:**
-1. `2b28c3d` - Implement Stage 1.5: LLM-Based Logical Parser
-2. `df7055e` - Update poetry.lock file
-3. `c9f3b73` - Fix import conflict between core.py and core/ directory
-4. `f13b461` - Resolve naming conflict between core.py and core/ directory
-5. `6012d87` - Fix import error: GLCSMemoryError → MemoryError
+| Phase | Stage | Component | Status | Notes |
+|-------|-------|-----------|--------|-------|
+| Phase 0 | 0.1 | Project Structure | Audited | 15/15 steps complete |
+| Phase 0 | 0.2 | Configuration Files | Audited | Using Poetry approach |
+| Phase 0 | 0.3 | Data Models (`models.py`) | Audited | 42 tests, serialization issues found (see #14, #15) |
+| Phase 0 | 0.4 | Config & Utilities | Audited | 37 tests passing |
+| Phase 1 | 1.1 | Semantic Encoder | Audited | 32 tests, thread-safety and doc issues found (see #32, #33) |
+| Phase 1 | 1.2 | Memory Manager | Audited | 29 tests, lossy storage found (see #41) |
+| Phase 1 | 1.3 | Consistency Checker | Audited | 18 tests, logic flaws found (see #21, #22) |
+| Phase 1 | 1.4 | LLM Logical Parser | Audited | 34/35 tests pass, cache bug found (see #11) |
+| Phase 1 | 1.5 | AdvancedGLCS Orchestrator | Audited | 9/14 tests pass, API mismatches (see #66, #67, #68) |
+| Phase 1 | 1.6 | Examples & Manual Testing | Audited | 5 demo scripts working |
+| Phase 2 | 2.1 | REST API | Audited | Multiple runtime crash bugs found (see #4, #5, #6) |
+| Phase 2 | 2.2 | WebSocket | Not started | Pending implementation |
 
 ---
 
-## Next Steps
+## TIER 1: CRITICAL — Fix Before Collaborator Pulls
 
-### Immediate (Stage 2.1): REST API
-1. Install FastAPI and dependencies
-2. Create glcs/api/app.py
-3. Implement core endpoints:
-   - POST /parse - Parse text to LogicalForm
-   - POST /check - Check consistency
-   - GET /search - Semantic search
-   - GET /contexts - List contexts
-4. Add OpenAPI/Swagger documentation
-5. Write API tests
+### 1.1 Test Suite Crashers
 
-### Future Enhancements
-- Hierarchical memory (Stage 3.1)
-- Multi-level consistency (Stage 3.2)
-- Docker containerization (Stage 4.1)
-- CI/CD pipeline (Stage 4.2)
-- Benchmarking (Stage 5.1)
-- PhD thesis writing (Stage 5.2)
+| # | Issue | File | Details |
+|---|-------|------|---------|
+| 1 | Raw script crashes entire test suite | `tests/unit/test_providers/test_ollama.py` | Not a test file. Instantiates `GLCSWrapper` at module level requiring a running Ollama server. Blocks all 311 tests from running. Delete or move out of `tests/`. |
+| 2 | Raw script in test directory | `tests/unit/gs_unittest.py` | Manual script, not a test. No test functions. Remove from `tests/`. |
+| 3 | Raw script in test directory | `tests/unit/test_full_pipeline.py` | Manual script, no test functions. Would crash on collection. Remove from `tests/`. |
 
----
+### 1.2 API Endpoints That Crash at Runtime
 
-## Testing Instructions
+| # | Issue | File | Details |
+|---|-------|------|---------|
+| 4 | `/search` endpoint crashes | `glcs/api/routes.py:300-308` | `search_similar()` returns `List[LogicalForm]` but route unpacks `(form, score)` tuples. Guaranteed `ValueError`. |
+| 5 | `/contexts` endpoint crashes | `glcs/api/routes.py:350` | Calls `glcs.list_contexts()` which does not exist on `AdvancedGLCS`. Guaranteed `AttributeError`. |
+| 6 | `/check` endpoint mutates state | `glcs/api/routes.py:234` | Calls `process_statement(auto_store=True)`, so a read-only check endpoint silently stores data. Should pass `auto_store=False`. |
+| 7 | CORS misconfiguration | `glcs/api/app.py:144-150` | `allow_origins=["*"]` + `allow_credentials=True` is prohibited by CORS spec. Browsers reject credentialed requests with wildcard origin. |
 
-### Quick Test (2 minutes)
-```bash
-# Pull latest code
-git pull origin claude/pull-develop-updates-01CZod2oW7k91HHJRMLqNMY2
+### 1.3 Repository Hygiene
 
-# Install dependencies
-poetry install
-
-# Test imports
-poetry run python -c "from glcs.core import LLMLogicalParser; from glcs.advanced_wrapper import AdvancedGLCS; print('✓ Imports successful!')"
-
-# Run unit tests
-poetry run pytest tests/unit/test_llm_parser.py -v
-
-# Run integration tests
-poetry run pytest tests/integration/test_advanced_glcs.py -v
-```
-
-### Interactive Demos
-```bash
-# LLM parser demo (8 demos)
-poetry run python examples/llm_parser_demo.py
-
-# Full pipeline demo (10 scenarios)
-poetry run python examples/advanced_glcs_demo.py
-```
-
-### Prerequisites
-- Ollama running: `ollama serve`
-- Model pulled: `ollama pull qwen2.5:0.5b`
-- All dependencies installed: `poetry install`
+| # | Issue | Details |
+|---|-------|---------|
+| 8 | Delete `nul` file | Accidental Windows artifact in repo root (54 bytes of error text). |
+| 9 | Fix `.gitignore` — missing entries | Add: `chroma_db/`, `*.json` at root level, `data/*.jsonl`. Currently `demo_memory.json`, `glcs_memory.json`, `streamlit_memory.json` and `data/test.jsonl` are at risk of accidental commit. |
+| 10 | Track `poetry.lock` | Currently in `.gitignore`. Collaborators cannot get reproducible builds without it. Remove `poetry.lock` from `.gitignore` and commit it. |
 
 ---
 
-## Notes
+## TIER 2: DATA INTEGRITY — Fix This Week
 
-- Python version: 3.10+ (compatible with Python 3.11)
-- Embedding model: all-mpnet-base-v2 (768 dimensions)
-- Default LLM provider: Ollama (free, local, offline)
-- Vector database: ChromaDB (embedded, no external service)
-- All changes committed and pushed to feature branch
-- Ready for code review and merge to develop
+### 2.1 Active Data Corruption Bugs
+
+| # | Issue | File | Details |
+|---|-------|------|---------|
+| 11 | Cache mutation bug | `glcs/core/logical_parser.py:239` | Cached `LogicalForm` returned by reference. `cached_form.context_id = context_id` mutates the cached object. If the same text is parsed for two contexts, the first caller's form is silently corrupted. Fix: return a deep copy. |
+| 12 | Cache key ignores provider/model | `glcs/core/logical_parser.py:190` | MD5 key only hashes text. Switching providers or temperature returns stale cached results from the old provider. Key must include provider name, model, and temperature. |
+| 13 | Unbounded in-memory cache | `glcs/core/logical_parser.py:149` | `self.cache: Dict[str, LogicalForm] = {}` grows without bound. No max size, no TTL, no LRU eviction. Will leak memory in long-running processes. |
+
+### 2.2 Broken Serialization
+
+| # | Issue | File | Details |
+|---|-------|------|---------|
+| 14 | `model_dump()` round-trip broken | `glcs/core/models.py:222-229` | `model_dump()` converts `np.ndarray` to list, but no validator converts list back to `np.ndarray`. `LogicalForm(**form.model_dump())` crashes. |
+| 15 | `model_dump_json()` crashes | `glcs/core/models.py` | Not overridden. Numpy arrays are not JSON-serializable by default. Any API serialization path using this will fail. |
+| 16 | `ErrorResponse.model_dump()` crashes | `glcs/api/app.py:190` | Returns `datetime` objects passed to `JSONResponse`, which uses `json.dumps` — `datetime` is not JSON-serializable. Should use `model_dump(mode='json')`. |
+
+### 2.3 Naming & Shadowing
+
+| # | Issue | File | Details |
+|---|-------|------|---------|
+| 17 | `MemoryError` shadows Python builtin | `glcs/utils/exceptions.py:80` | `class MemoryError(GLCSException)` shadows Python's built-in `MemoryError`. Any importing module loses access to the real one. Rename to `GLCSMemoryError`. |
+| 18 | Dual `ConsistencyChecker` name collision | `glcs/__init__.py:10` vs `glcs/core/consistency_checker.py` | Two entirely different classes with the same name. `from glcs import ConsistencyChecker` gives the simple one; `from glcs.core import ConsistencyChecker` gives the advanced one. |
+
+### 2.4 Configuration Mismatch
+
+| # | Issue | File | Details |
+|---|-------|------|---------|
+| 19 | Model/dimension mismatch | `config/glcs_config.yaml` | Specifies `model_name: "all-MiniLM-L6-v2"` (384-dim) alongside `vector_dimension: 768`. The encoder hardcodes 768. If anyone uses the config, instant crash. |
+| 20 | `datetime.utcnow()` deprecated | `models.py:195,266,300`, `logical_parser.py:442`, `routes.py:99,107,157,185,251` | Deprecated since Python 3.12. Returns timezone-naive datetimes. Replace with `datetime.now(timezone.utc)`. |
 
 ---
 
-**Last Updated:** 2025-11-18 by Claude (after Stage 1.5 completion)
+## TIER 3: ENGINEERING QUALITY — Fix Before PyPI Release
+
+### 3.1 Consistency Checker Logic
+
+| # | Issue | File | Details |
+|---|-------|------|---------|
+| 21 | Universal-ground check is logically broken | `consistency_checker.py:396-424` | Only checks `rule.object.name == fact.object.name` with opposite polarity. Does NOT verify the fact's subject is an instance of the rule's subject class. Ignores the predicate entirely. "All dogs eat meat" vs "Cats don't eat meat" -> false positive. "All birds fly" vs "Rocks don't fly" -> false positive. |
+| 22 | Polarity check is trivially narrow | `consistency_checker.py:286-320` | Requires BOTH exact structural match (same subject/predicate/object names) AND high embedding similarity. Can only catch the trivial case of exact same words with "not" added. Any paraphrase contradiction is missed. |
+| 23 | O(n^2) pairwise comparisons | `consistency_checker.py:263-268, 447-452` | No indexing, batching, or early exit. 1000 forms = 500K comparisons. Embedding comparisons should be a single matrix multiply. |
+
+### 3.2 Provider System
+
+| # | Issue | Files | Details |
+|---|-------|-------|---------|
+| 24 | String-based error classification | All 5 providers | `str(e).lower()` substring matching instead of catching SDK typed exceptions (`openai.RateLimitError`, etc.). Fragile, loses error context. |
+| 25 | Factory crashes on re-import | `glcs/providers/factory.py:28-29` | `register()` raises `ValueError` on duplicate name. If `glcs.providers` is re-imported or `clear()` is called, the factory breaks. |
+| 26 | Ollama auto-pulls models without consent | `glcs/providers/ollama_provider.py:92-103` | Constructor silently downloads multi-GB models. Dangerous in CI/CD. Should be opt-in. |
+| 27 | `validate_config()` runs after constructor | All providers | By the time validation runs, the client is already initialized with potentially invalid credentials. Validation is theater. |
+| 28 | Copy-paste providers | `openai_provider.py` ~ `groq_provider.py` | Near-identical `generate()` methods. The base class `_convert_messages()` hook exists but is unused. No actual abstraction. |
+| 29 | `print()` used instead of logging | `ollama_provider.py:93,96,248,250` | Library code should never use `print()`. Use `logger.info()`. |
+| 30 | Bare `except:` clause | `ollama_provider.py:211` | Catches everything including `KeyboardInterrupt` and `SystemExit`. Use `except Exception:`. |
+| 31 | Provider SDK packages not in `pyproject.toml` | `pyproject.toml` | `anthropic`, `google-generativeai`, `groq` are not listed as optional extras. Users cannot `pip install glcs[anthropic]`. |
+
+### 3.3 Thread Safety & Performance
+
+| # | Issue | File | Details |
+|---|-------|------|---------|
+| 32 | Thread-unsafe singleton | `glcs/core/semantic_encoder.py:62-64,96-105` | Docstring claims "thread-safe singleton" but has zero locking. Two threads can both load the 420MB model simultaneously. Add `threading.Lock`. |
+| 33 | Docstring lies about lazy loading | `glcs/core/semantic_encoder.py:75-80` | Docstring says "loaded lazily on first encode() call" but `_load_model()` is called in `__init__`. Model loads eagerly on construction. |
+| 34 | Eager imports load entire ML stack | `glcs/core/__init__.py:12-24` | Importing `Entity` from `glcs.core` triggers loading of sentence-transformers, ChromaDB, and LLM libraries. Use lazy imports. |
+| 35 | `list_contexts` fetches all forms | `memory_manager.py:521-532` | Loads every metadata dict into memory just to extract unique context IDs. Will OOM at scale. |
+| 36 | `get_context_stats` reconstructs full objects | `memory_manager.py:590` | Builds full `LogicalForm` objects (including numpy arrays) just to count types. Should query metadata only. |
+
+### 3.4 Data Model Issues
+
+| # | Issue | File | Details |
+|---|-------|------|---------|
+| 37 | Hardcoded 768-dim everywhere | `models.py:218`, `semantic_encoder.py:79,143,210`, `memory_manager.py:367` | Embedding dimension baked into validators. Cannot swap encoder model without touching code in 3 files. `self.embedding_dim` attribute exists on SemanticEncoder but is unused by the validation checks. |
+| 38 | `violation_type` is unvalidated string | `models.py:262` | No enum, any string passes. Compare to `LogicalType` and `Polarity` which are proper enums. |
+| 39 | `severity` validated by regex, not enum | `models.py:264` | Uses `pattern="^(HIGH\|MEDIUM\|LOW)$"` instead of a `Severity` enum. No IDE autocomplete, no type safety. |
+| 40 | `ConsistencyReport.is_consistent` requires manual sync | `models.py:303-316` | Caller must manually compute `is_consistent = (len(violations) == 0)` and pass it. Should be a computed field. |
+| 41 | Lossy storage round-trip | `memory_manager.py:647-695` | `store_form()` -> `retrieve_form()` loses `entity_type`, `relation_type`, `metadata`, all entity UUIDs. Reconstructed entities get new random IDs. |
+| 42 | Metadata duplication | `memory_manager.py:155-163, 254-263` | Identical metadata dict construction in `store_form` and `update_form`. DRY violation. |
+
+### 3.5 Dead Code & Unused Imports
+
+| # | Issue | File | Details |
+|---|-------|------|---------|
+| 43 | `augmented_prompt` is dead code | `llm_wrapper.py:246-250` | Context augmentation is built but never sent to the LLM. The entire memory-augmented generation feature is fake. The `_build_context` method has zero effect on actual LLM calls. |
+| 44 | `validate_config` never returns False | `glcs/utils/config_manager.py:110-180` | Return type is `bool` but only ever returns `True` or raises. The `if not validate_config()` check in caller is dead code. |
+| 45 | `_convert_messages` is dead code | `glcs/providers/base.py:91-103` | No provider overrides it, no code calls it. |
+| 46 | Unused imports | Various | `format_exception_message` (memory_manager.py:33), `Path` (memory_manager.py:24), `uuid4` (logical_parser.py:27), `Tuple` (consistency_checker.py:29), `Optional` (all provider files). |
+
+### 3.6 API & Security
+
+| # | Issue | File | Details |
+|---|-------|------|---------|
+| 47 | Exception details leaked to client | `glcs/api/routes.py:153,165,267,324` | Raw `str(e)` in HTTP responses. Can expose internal paths, DB errors, stack traces. Sanitize before returning. |
+| 48 | Global exception handler shadows HTTPException | `glcs/api/app.py:176-191` | `@app.exception_handler(Exception)` may intercept FastAPI's own 404/422 handlers, turning them into 500s. |
+| 49 | Startup failure silently swallowed | `glcs/api/app.py:67-69` | If GLCS init fails, API starts anyway and every endpoint returns 503. Should fail hard or expose a health check. |
+| 50 | `glcs: AdvancedGLCS = None` wrong type | `glcs/api/routes.py:33` | Type annotation says `AdvancedGLCS` but value is `None`. Should be `Optional[AdvancedGLCS]`. |
+| 51 | Pydantic V1 syntax in API models | `glcs/api/models.py` | Uses `class Config:` (V1) instead of `model_config = ConfigDict(...)` (V2). `min_items` should be `min_length` in V2. |
+| 52 | API key exposed in `ProviderConfig.__repr__` | `glcs/providers/base.py` | Default `@dataclass` repr prints `api_key` in plain text in logs/tracebacks. Should mask it. |
+
+### 3.7 Test Quality
+
+| # | Issue | Details |
+|---|-------|---------|
+| 53 | Fake test patterns | `assert True` (test_smoke.py:49), `assert isinstance(x, object)` (test_parser.py:94), `except Exception: pass` (test_provider_system.py:310). Provide false confidence. |
+| 54 | Integration tests mock the LLM | `test_advanced_glcs.py` — every test mocks `_call_llm`. These are unit tests in disguise, not integration tests. |
+| 55 | Stale test assertion | `test_llm_parser.py:59` — asserts default model is `llama3.2` but code now defaults to `qwen2.5:0.5b`. |
+| 56 | `@pytest.mark.requires_api_key` not registered | `test_provider_system.py` — marker not in `pytest.ini`, tests run unconditionally and fail. |
+| 57 | No `conftest.py` | No shared fixtures file. Test setup duplicated across files. |
+
+### 3.8 Project Packaging
+
+| # | Issue | Details |
+|---|-------|---------|
+| 58 | Missing PyPI metadata | No `license`, `classifiers`, `keywords`, `homepage`, `repository` fields in `pyproject.toml`. |
+| 59 | `authors = ["PhD Project"]` | Not in standard `"Name <email>"` format. Will cause issues during PyPI publication. |
+| 60 | No CLI entry point | No `[tool.poetry.scripts]` defined. Package has no command-line interface. |
+| 61 | No log rotation | `config/logging.yaml` uses append mode with no rotation. Log files grow unbounded. |
+| 62 | `glcs/hierarchical/` is empty | Empty placeholder subpackage with no modules. Remove or document as future work. |
+| 63 | Advanced API not exported | `glcs/__init__.py:14-15` — `AdvancedGLCS`, `LLMLogicalParser`, etc. are commented out. Users must know internal module paths. |
+| 64 | Dual config systems | `glcs/config.py` (ConfigLoader) and `glcs/utils/config_manager.py` (load_config) both provide configuration loading. Unclear which to use. |
+| 65 | `.env.template` incomplete | Only documents 3 API keys. Missing: `GROQ_API_KEY`, `OLLAMA_ENDPOINT`, `OLLAMA_MODEL`, `GLCS_DEFAULT_PROVIDER`, `GLCS_TEMPERATURE`, `GLCS_MAX_TOKENS`, and all model override vars. |
+
+### 3.9 Previously Identified Gaps (from original audit)
+
+| # | Issue | File | Details |
+|---|-------|------|---------|
+| 66 | Missing `embedding_dim` property | `glcs/core/semantic_encoder.py` | `self.embedding_dim = 768` is set but never exposed as a property. Integration tests expect `encoder.embedding_dim` — 5 test failures trace to this. |
+| 67 | `search_by_entity` missing `context_id` support | `glcs/core/memory_manager.py` | Integration tests call `search_by_entity(name, context_id=...)` but the method signature or behavior does not properly support the `context_id` filter. |
+| 68 | Missing `save_state()`/`load_state()` methods | `glcs/advanced_wrapper.py` | State persistence is implicit via ChromaDB's `persist_directory`. No explicit save/load API. Should be added for clarity and portability. |
+| 69 | Missing `clear_all()` method | `glcs/core/memory_manager.py` | `clear_context(context_id)` exists but no global `clear_all()` to wipe the entire store. Needed for testing and reset scenarios. |
+| 70 | `switch_provider` half-updates on failure | `glcs/core/logical_parser.py:537-555` | Updates `self.provider_name` before `ProviderFactory.create()`. If factory raises, the object is in an inconsistent state (name changed, provider unchanged). |
+| 71 | `_validate_extraction` mutates input | `glcs/core/logical_parser.py:349-365` | A method named "validate" silently mutates the input dict by inserting defaults. Violates single responsibility. |
+| 72 | `parse_batch` silently drops failures | `glcs/core/logical_parser.py:479-485` | Failed items logged as warning but dropped. Caller gets a shorter list with no indication which items failed. |
+| 73 | `process_batch` silently drops failures | `glcs/advanced_wrapper.py:212-217` | Same pattern — failed statements silently dropped. |
+| 74 | `delete_form` silently succeeds when form doesn't exist | `memory_manager.py:292` | ChromaDB's `delete` doesn't error on missing IDs. No way to know if deletion actually happened. |
+| 75 | `update_form` wasteful existence check | `memory_manager.py:243-247` | Fully reconstructs a `LogicalForm` (including numpy array) just to verify the form exists, then throws it away. Should use a lightweight ID check. |
+| 76 | `_check_redundancy` order-of-operations bug | `consistency_checker.py:470-479` | Exact text match with different polarity is flagged as "EXACT_REDUNDANCY" (LOW severity) instead of contradiction. Polarity check only happens on the semantic redundancy path. |
+| 77 | `_calculate_severity` has dead branches | `consistency_checker.py:565-569` | Has branches for "REDUNDANCY" and "UNIVERSAL_GROUND_CONTRADICTION" but those violation types hardcode their severity and never call this method. |
+| 78 | Gemini model recreated every call | `glcs/providers/gemini_provider.py:99-103` | Every `generate()` call with a system instruction creates a new `GenerativeModel` instance. Wasteful. |
+| 79 | History unbounded in `llm_wrapper.py` | `glcs/llm_wrapper.py:95,255,280` | Conversation history grows without limit. Only sliced for API calls but list itself never trimmed. Memory leak. |
+| 80 | `load_dotenv()` at import time | `glcs/llm_wrapper.py:23` | Side effect at import. Contaminates test environments. |
+| 81 | Logging fallback hides config problems | `glcs/utils/logger.py:126-134` | Missing config file silently falls back to basicConfig. No warning emitted. |
+| 82 | No `__repr__` for LogicalForm | `glcs/core/models.py` | Default Pydantic repr prints the entire 768-float embedding array, making logs unreadable. |
+| 83 | Mutable default in ProviderConfig | `glcs/providers/base.py:18` | `extra: Dict[str, Any] = None` patched via `__post_init__`. Should use `field(default_factory=dict)`. |
+
+---
+
+## Progress Tracker
+
+| Tier | Total | Fixed | Remaining |
+|------|-------|-------|-----------|
+| Tier 1: Critical | 10 | 0 | 10 |
+| Tier 2: Data Integrity | 10 | 0 | 10 |
+| Tier 3: Engineering Quality | 63 | 0 | 63 |
+| **Total** | **83** | **0** | **83** |
+
+---
+
+**Last Updated:** 2026-03-05
+**Audited By:** Claude Opus 4.6 (full codebase audit)
