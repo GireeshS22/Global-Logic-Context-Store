@@ -62,9 +62,9 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 11 | Cache mutation bug | `glcs/core/logical_parser.py:239` | Cached `LogicalForm` returned by reference. `cached_form.context_id = context_id` mutates the cached object. If the same text is parsed for two contexts, the first caller's form is silently corrupted. Fix: return a deep copy. |
-| 12 | Cache key ignores provider/model | `glcs/core/logical_parser.py:190` | MD5 key only hashes text. Switching providers or temperature returns stale cached results from the old provider. Key must include provider name, model, and temperature. |
-| 13 | Unbounded in-memory cache | `glcs/core/logical_parser.py:149` | `self.cache: Dict[str, LogicalForm] = {}` grows without bound. No max size, no TTL, no LRU eviction. Will leak memory in long-running processes. |
+| 11 | ~~Cache mutation bug~~ | `glcs/core/logical_parser.py:239` | Cached `LogicalForm` returned by reference. `cached_form.context_id = context_id` mutates the cached object. If the same text is parsed for two contexts, the first caller's form is silently corrupted. Fix: return a deep copy. |
+| 12 | ~~Cache key ignores provider/model~~ | `glcs/core/logical_parser.py:190` | MD5 key only hashes text. Switching providers or temperature returns stale cached results from the old provider. Key must include provider name, model, and temperature. |
+| 13 | ~~Unbounded in-memory cache~~ | `glcs/core/logical_parser.py:149` | `self.cache: Dict[str, LogicalForm] = {}` grows without bound. No max size, no TTL, no LRU eviction. Will leak memory in long-running processes. |
 
 ### 2.2 Broken Serialization
 
@@ -160,7 +160,7 @@ Carried forward from original audit. Tracks which components have been verified.
 |---|-------|---------|
 | 53 | Fake test patterns | `assert True` (test_smoke.py:49), `assert isinstance(x, object)` (test_parser.py:94), `except Exception: pass` (test_provider_system.py:310). Provide false confidence. |
 | 54 | Integration tests mock the LLM | `test_advanced_glcs.py` — every test mocks `_call_llm`. These are unit tests in disguise, not integration tests. |
-| 55 | Stale test assertion | `test_llm_parser.py:59` — asserts default model is `llama3.2` but code now defaults to `qwen2.5:0.5b`. |
+| 55 | ~~Stale test assertion~~ | `test_llm_parser.py:59` — asserts default model is `llama3.2` but code now defaults to `qwen2.5:0.5b`. |
 | 56 | `@pytest.mark.requires_api_key` not registered | `test_provider_system.py` — marker not in `pytest.ini`, tests run unconditionally and fail. |
 | 57 | No `conftest.py` | No shared fixtures file. Test setup duplicated across files. |
 
@@ -207,11 +207,11 @@ Carried forward from original audit. Tracks which components have been verified.
 | Tier | Total | Fixed | Remaining |
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
-| Tier 2: Data Integrity | 10 | 0 | 10 |
-| Tier 3: Engineering Quality | 63 | 0 | 63 |
-| **Total** | **83** | **10** | **73** |
+| Tier 2: Data Integrity | 10 | 3 | 7 |
+| Tier 3: Engineering Quality | 63 | 1 | 62 |
+| **Total** | **83** | **14** | **69** |
 
 ---
 
-**Last Updated:** 2026-03-05 (Tier 1 complete — 10/10 fixed)
+**Last Updated:** 2026-03-06 (Tier 2 in progress — 3/10 fixed; bonus #55 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)
