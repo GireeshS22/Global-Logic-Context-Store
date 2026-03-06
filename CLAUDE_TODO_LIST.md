@@ -70,9 +70,9 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 14 | `model_dump()` round-trip broken | `glcs/core/models.py:222-229` | `model_dump()` converts `np.ndarray` to list, but no validator converts list back to `np.ndarray`. `LogicalForm(**form.model_dump())` crashes. |
-| 15 | `model_dump_json()` crashes | `glcs/core/models.py` | Not overridden. Numpy arrays are not JSON-serializable by default. Any API serialization path using this will fail. |
-| 16 | `ErrorResponse.model_dump()` crashes | `glcs/api/app.py:190` | Returns `datetime` objects passed to `JSONResponse`, which uses `json.dumps` — `datetime` is not JSON-serializable. Should use `model_dump(mode='json')`. |
+| 14 | ~~`model_dump()` round-trip broken~~ | `glcs/core/models.py:222-229` | `model_dump()` converts `np.ndarray` to list, but no validator converts list back to `np.ndarray`. `LogicalForm(**form.model_dump())` crashes. |
+| 15 | ~~`model_dump_json()` crashes~~ | `glcs/core/models.py` | Not overridden. Numpy arrays are not JSON-serializable by default. Any API serialization path using this will fail. |
+| 16 | ~~`ErrorResponse.model_dump()` crashes~~ | `glcs/api/app.py:190` | Returns `datetime` objects passed to `JSONResponse`, which uses `json.dumps` — `datetime` is not JSON-serializable. Should use `model_dump(mode='json')`. |
 
 ### 2.3 Naming & Shadowing
 
@@ -207,11 +207,11 @@ Carried forward from original audit. Tracks which components have been verified.
 | Tier | Total | Fixed | Remaining |
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
-| Tier 2: Data Integrity | 10 | 3 | 7 |
+| Tier 2: Data Integrity | 10 | 6 | 4 |
 | Tier 3: Engineering Quality | 63 | 1 | 62 |
-| **Total** | **83** | **14** | **69** |
+| **Total** | **83** | **17** | **66** |
 
 ---
 
-**Last Updated:** 2026-03-06 (Tier 2 in progress — 3/10 fixed; bonus #55 fixed)
+**Last Updated:** 2026-03-06 (Tier 2 in progress — 6/10 fixed; bonus #55 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)
