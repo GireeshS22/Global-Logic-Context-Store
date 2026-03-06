@@ -191,7 +191,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
     return JSONResponse(
         status_code=500,
-        content=error_response.model_dump()
+        content=error_response.model_dump(mode="json")  # (#16: mode=json converts datetime to ISO string)
     )
 
 

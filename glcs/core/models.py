@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
 
 
 # ============================================================================
@@ -208,25 +208,32 @@ class LogicalForm(BaseModel):
         validate_assignment=True  # Run validators on field assignment
     )
 
-    @field_validator('embedding')
+    @field_validator('embedding', mode='before')
     @classmethod
-    def validate_embedding_dimension(cls, v: Optional[np.ndarray]) -> Optional[np.ndarray]:
-        """Validate that embedding is 768-dimensional if present."""
-        if v is not None:
-            if not isinstance(v, np.ndarray):
-                raise ValueError("Embedding must be a numpy array")
-            if v.shape != (768,):
-                raise ValueError(f"Embedding must be 768-dimensional, got shape {v.shape}")
+    def coerce_and_validate_embedding(cls, v: Any) -> Optional[np.ndarray]:
+        """Accept list or numpy array; validate 768-dim shape.
+
+        (#14) Accepting a list means LogicalForm(**form.model_dump()) round-trips
+        correctly — model_dump() serializes to list, this validator converts it back.
+        """
+        if v is None:
+            return v
+        if isinstance(v, list):
+            v = np.array(v, dtype=np.float64)
+        if not isinstance(v, np.ndarray):
+            raise ValueError("Embedding must be a numpy array or list")
+        if v.shape != (768,):
+            raise ValueError(f"Embedding must be 768-dimensional, got shape {v.shape}")
         return v
 
-    def model_dump(self, **kwargs) -> Dict[str, Any]:
+    @field_serializer('embedding')
+    def serialize_embedding(self, v: Optional[np.ndarray]) -> Optional[list]:
+        """Convert numpy array to list for all serialization paths.
+
+        (#15) Called by both model_dump() and model_dump_json(), so numpy arrays
+        are never passed raw to json.dumps().
         """
-        Override to convert numpy array to list for JSON serialization.
-        """
-        data = super().model_dump(**kwargs)
-        if data.get('embedding') is not None:
-            data['embedding'] = data['embedding'].tolist()
-        return data
+        return v.tolist() if v is not None else None
 
 
 # ============================================================================
