@@ -19,9 +19,11 @@ Author: GLCS PhD Research Team
 Version: 1.0.0 (Stage 1.5)
 """
 
+import copy
 import json
 import time
 import hashlib
+from collections import OrderedDict
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime
 from uuid import uuid4
@@ -120,6 +122,7 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
         api_key: Optional[str] = None,
         config: Optional[Dict[str, Any]] = None,
         cache_enabled: bool = True,
+        cache_max_size: int = 1000,
         max_retries: int = 3,
         timeout: int = 30,
     ):
@@ -133,6 +136,7 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
             api_key: API key for cloud providers (not needed for Ollama)
             config: Additional provider configuration
             cache_enabled: Enable in-memory caching of parsed results
+            cache_max_size: Maximum number of cached results (LRU eviction when exceeded)
             max_retries: Maximum retry attempts on parsing failure
             timeout: Request timeout in seconds
 
@@ -142,16 +146,19 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
         # Default to Ollama for offline/local usage
         self.provider_name = provider or 'ollama'
         self.cache_enabled = cache_enabled
+        self.cache_max_size = cache_max_size
         self.max_retries = max_retries
         self.timeout = timeout
 
-        # Initialize cache
-        self.cache: Dict[str, LogicalForm] = {}
+        # Initialize cache (#13: bounded LRU cache via OrderedDict)
+        self.cache: OrderedDict[str, LogicalForm] = OrderedDict()
 
         # Create provider configuration
+        self._model: str = model or self._get_default_model(self.provider_name)
+        self._temperature: float = 0.1  # Low temperature for consistency
         provider_config = {
-            'model': model or self._get_default_model(self.provider_name),
-            'temperature': 0.1,  # Low temperature for consistency
+            'model': self._model,
+            'temperature': self._temperature,  # Low temperature for consistency
             'max_tokens': 300,
             'timeout': timeout,
         }
@@ -186,8 +193,10 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
         return defaults.get(provider_name, 'qwen2.5:0.5b')
 
     def _get_cache_key(self, text: str) -> str:
-        """Generate cache key from text."""
-        return hashlib.md5(text.encode('utf-8')).hexdigest()
+        """Generate cache key from text, provider, model, and temperature."""
+        # (#12: include provider/model/temperature so switching provider never returns stale results)
+        key_data = f"{self.provider_name}:{self._model}:{self._temperature}:{text}"
+        return hashlib.md5(key_data.encode('utf-8')).hexdigest()
 
     def parse(
         self,
@@ -234,10 +243,12 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
             cache_key = self._get_cache_key(text)
             if cache_key in self.cache:
                 logger.debug(f"Cache hit for: {text[:50]}...")
-                cached_form = self.cache[cache_key]
-                # Update context_id to current context
-                cached_form.context_id = context_id
-                return cached_form
+                # (#11: deep copy prevents callers from mutating the cached object)
+                # (#13: move to end = most recently used for LRU eviction)
+                self.cache.move_to_end(cache_key)
+                copied = copy.deepcopy(self.cache[cache_key])
+                copied.context_id = context_id
+                return copied
 
         # Parse with retry logic
         last_error = None
@@ -256,10 +267,13 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
                     context_id
                 )
 
-                # Cache result
+                # Cache result (#13: bounded LRU — evict oldest when at capacity)
                 if self.cache_enabled:
                     cache_key = self._get_cache_key(text)
                     self.cache[cache_key] = form
+                    self.cache.move_to_end(cache_key)
+                    if len(self.cache) > self.cache_max_size:
+                        self.cache.popitem(last=False)  # Remove least recently used
 
                 logger.info(f"Successfully parsed: {text[:50]}... (confidence: {form.confidence_score:.2f})")
                 return form
@@ -535,10 +549,13 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
             >>> parser.switch_provider('openai', model='gpt-4o')
         """
         self.provider_name = provider_name
+        # (#12: keep _model/_temperature in sync so cache keys remain correct)
+        self._model = model or self._get_default_model(provider_name)
+        self._temperature = 0.1
 
         provider_config = {
-            'model': model or self._get_default_model(provider_name),
-            'temperature': 0.1,
+            'model': self._model,
+            'temperature': self._temperature,
             'max_tokens': 300,
             'timeout': self.timeout,
         }

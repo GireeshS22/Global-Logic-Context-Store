@@ -56,7 +56,7 @@ class TestLLMLogicalParserInitialization:
     def test_get_default_model(self):
         """Test default model selection for each provider."""
         parser = LLMLogicalParser()
-        assert parser._get_default_model('ollama') == 'llama3.2'
+        assert parser._get_default_model('ollama') == 'qwen2.5:0.5b'
         assert parser._get_default_model('openai') == 'gpt-4o-mini'
         assert parser._get_default_model('anthropic') == 'claude-3-5-sonnet-20241022'
 
