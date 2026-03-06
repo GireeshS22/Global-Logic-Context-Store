@@ -62,17 +62,17 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 11 | ~~Cache mutation bug~~ | `glcs/core/logical_parser.py:239` | Cached `LogicalForm` returned by reference. `cached_form.context_id = context_id` mutates the cached object. If the same text is parsed for two contexts, the first caller's form is silently corrupted. Fix: return a deep copy. |
-| 12 | ~~Cache key ignores provider/model~~ | `glcs/core/logical_parser.py:190` | MD5 key only hashes text. Switching providers or temperature returns stale cached results from the old provider. Key must include provider name, model, and temperature. |
-| 13 | ~~Unbounded in-memory cache~~ | `glcs/core/logical_parser.py:149` | `self.cache: Dict[str, LogicalForm] = {}` grows without bound. No max size, no TTL, no LRU eviction. Will leak memory in long-running processes. |
+| 11 | ~~Cache mutation bug~~ | ~~`glcs/core/logical_parser.py:239`~~ | **FIXED** Returns `copy.deepcopy()` on cache hit — callers cannot mutate the cached object. |
+| 12 | ~~Cache key ignores provider/model~~ | ~~`glcs/core/logical_parser.py:190`~~ | **FIXED** Cache key now hashes `provider:model:temperature:text`. |
+| 13 | ~~Unbounded in-memory cache~~ | ~~`glcs/core/logical_parser.py:149`~~ | **FIXED** Replaced `Dict` with `OrderedDict` + LRU eviction, capped at `cache_max_size=1000`. |
 
 ### 2.2 Broken Serialization
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 14 | ~~`model_dump()` round-trip broken~~ | `glcs/core/models.py:222-229` | `model_dump()` converts `np.ndarray` to list, but no validator converts list back to `np.ndarray`. `LogicalForm(**form.model_dump())` crashes. |
-| 15 | ~~`model_dump_json()` crashes~~ | `glcs/core/models.py` | Not overridden. Numpy arrays are not JSON-serializable by default. Any API serialization path using this will fail. |
-| 16 | ~~`ErrorResponse.model_dump()` crashes~~ | `glcs/api/app.py:190` | Returns `datetime` objects passed to `JSONResponse`, which uses `json.dumps` — `datetime` is not JSON-serializable. Should use `model_dump(mode='json')`. |
+| 14 | ~~`model_dump()` round-trip broken~~ | ~~`glcs/core/models.py:222-229`~~ | **FIXED** `mode='before'` validator accepts list and converts back to `np.ndarray`. Round-trip works. |
+| 15 | ~~`model_dump_json()` crashes~~ | ~~`glcs/core/models.py`~~ | **FIXED** `@field_serializer('embedding')` converts `np.ndarray` to list on all serialization paths. |
+| 16 | ~~`ErrorResponse.model_dump()` crashes~~ | ~~`glcs/api/app.py:190`~~ | **FIXED** Global exception handler now uses `model_dump(mode='json')` — `datetime` serialises to ISO string. |
 
 ### 2.3 Naming & Shadowing
 
@@ -160,7 +160,7 @@ Carried forward from original audit. Tracks which components have been verified.
 |---|-------|---------|
 | 53 | Fake test patterns | `assert True` (test_smoke.py:49), `assert isinstance(x, object)` (test_parser.py:94), `except Exception: pass` (test_provider_system.py:310). Provide false confidence. |
 | 54 | Integration tests mock the LLM | `test_advanced_glcs.py` — every test mocks `_call_llm`. These are unit tests in disguise, not integration tests. |
-| 55 | ~~Stale test assertion~~ | `test_llm_parser.py:59` — asserts default model is `llama3.2` but code now defaults to `qwen2.5:0.5b`. |
+| 55 | ~~Stale test assertion~~ | ~~`test_llm_parser.py:59`~~ | **FIXED** Updated assertion: Ollama default model is `qwen2.5:0.5b`. |
 | 56 | `@pytest.mark.requires_api_key` not registered | `test_provider_system.py` — marker not in `pytest.ini`, tests run unconditionally and fail. |
 | 57 | No `conftest.py` | No shared fixtures file. Test setup duplicated across files. |
 
