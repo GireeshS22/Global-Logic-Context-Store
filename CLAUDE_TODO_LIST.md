@@ -78,15 +78,15 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 17 | `MemoryError` shadows Python builtin | `glcs/utils/exceptions.py:80` | `class MemoryError(GLCSException)` shadows Python's built-in `MemoryError`. Any importing module loses access to the real one. Rename to `GLCSMemoryError`. |
-| 18 | Dual `ConsistencyChecker` name collision | `glcs/__init__.py:10` vs `glcs/core/consistency_checker.py` | Two entirely different classes with the same name. `from glcs import ConsistencyChecker` gives the simple one; `from glcs.core import ConsistencyChecker` gives the advanced one. |
+| 17 | ~~`MemoryError` shadows Python builtin~~ | ~~`glcs/utils/exceptions.py:80`~~ | **FIXED** Renamed to `GLCSMemoryError`. Updated all imports in `memory_manager.py`, `advanced_wrapper.py`, `test_exceptions.py`, `test_memory_manager.py`. |
+| 18 | ~~Dual `ConsistencyChecker` name collision~~ | ~~`glcs/__init__.py:10` vs `glcs/core/consistency_checker.py`~~ | **FIXED** Simple class renamed to `SimpleConsistencyChecker` in `glcs/checker.py`. Updated `__init__.py`, `llm_wrapper.py`, 3 examples, and 2 test files. Advanced `ConsistencyChecker` in `glcs/core/` unchanged. |
 
 ### 2.4 Configuration Mismatch
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 19 | Model/dimension mismatch | `config/glcs_config.yaml` | Specifies `model_name: "all-MiniLM-L6-v2"` (384-dim) alongside `vector_dimension: 768`. The encoder hardcodes 768. If anyone uses the config, instant crash. |
-| 20 | `datetime.utcnow()` deprecated | `models.py:195,266,300`, `logical_parser.py:442`, `routes.py:99,107,157,185,251` | Deprecated since Python 3.12. Returns timezone-naive datetimes. Replace with `datetime.now(timezone.utc)`. |
+| 19 | ~~Model/dimension mismatch~~ | ~~`config/glcs_config.yaml`~~ | **FIXED** Config model changed to `all-mpnet-base-v2` (768-dim). `embedding_dim` now derived from `model.get_sentence_embedding_dimension()` — no longer hardcoded. |
+| 20 | ~~`datetime.utcnow()` deprecated~~ | ~~`models.py`, `logical_parser.py`, `app.py`, `routes.py`~~ | **FIXED** All 10 occurrences replaced with `datetime.now(timezone.utc)`. `timezone` added to imports in all 4 files. |
 
 ---
 
@@ -207,11 +207,11 @@ Carried forward from original audit. Tracks which components have been verified.
 | Tier | Total | Fixed | Remaining |
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
-| Tier 2: Data Integrity | 10 | 6 | 4 |
+| Tier 2: Data Integrity | 10 | 10 | 0 |
 | Tier 3: Engineering Quality | 63 | 1 | 62 |
-| **Total** | **83** | **17** | **66** |
+| **Total** | **83** | **21** | **62** |
 
 ---
 
-**Last Updated:** 2026-03-06 (Tier 2 in progress — 6/10 fixed; bonus #55 fixed)
+**Last Updated:** 2026-03-19 (Tier 2 complete — 10/10 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)

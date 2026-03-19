@@ -18,7 +18,7 @@ All models use Pydantic v2 for automatic validation, type checking, and
 JSON serialization.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
@@ -192,7 +192,7 @@ class LogicalForm(BaseModel):
 
     form_id: UUID = Field(default_factory=uuid4)
     context_id: str = Field(..., min_length=1)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     logical_type: LogicalType
     subject: Entity
     predicate: Relation
@@ -270,7 +270,7 @@ class Violation(BaseModel):
     conflicting_forms: List[UUID] = Field(..., min_length=2)
     severity: str = Field(..., pattern="^(HIGH|MEDIUM|LOW)$")
     explanation: str = Field(..., min_length=1)
-    detected_at: datetime = Field(default_factory=datetime.utcnow)
+    detected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -304,7 +304,7 @@ class ConsistencyReport(BaseModel):
     is_consistent: bool
     violations: List[Violation] = Field(default_factory=list)
     total_forms_checked: int = Field(..., ge=0)
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode='after')

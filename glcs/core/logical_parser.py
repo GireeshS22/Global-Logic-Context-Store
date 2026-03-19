@@ -25,7 +25,7 @@ import time
 import hashlib
 from collections import OrderedDict
 from typing import List, Optional, Dict, Any, Tuple
-from datetime import datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from glcs.core.models import (
@@ -453,7 +453,7 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
             polarity=Polarity(data['polarity']),
             confidence_score=float(data['confidence']),
             source_text=source_text,
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
 
         return form

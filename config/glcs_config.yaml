@@ -5,7 +5,7 @@
 # Memory Configuration
 memory:
   # Vector dimension (must match encoder output)
-  # 768 for all-MiniLM-L6-v2, 384 for base models
+  # 768 for all-mpnet-base-v2, 384 for all-MiniLM-L6-v2
   vector_dimension: 768
 
   # Similarity threshold for retrieving related statements
@@ -28,8 +28,8 @@ consistency:
 # Semantic Encoder Configuration
 encoder:
   # Sentence-transformer model name
-  # Options: all-MiniLM-L6-v2 (384-dim), all-mpnet-base-v2 (768-dim)
-  model_name: "sentence-transformers/all-MiniLM-L6-v2"
+  # Options: all-mpnet-base-v2 (768-dim), all-MiniLM-L6-v2 (384-dim)
+  model_name: "all-mpnet-base-v2"
 
   # Batch size for encoding multiple statements
   batch_size: 32
