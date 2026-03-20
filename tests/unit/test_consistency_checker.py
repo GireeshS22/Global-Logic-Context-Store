@@ -161,7 +161,11 @@ def test_no_polarity_contradiction_same_polarity(consistency_checker, encoder, m
 # ============================================================================
 
 def test_detect_universal_ground_contradiction(consistency_checker, encoder, memory_manager):
-    """Test detection of universal rule vs ground fact contradiction."""
+    """Test detection of universal rule vs ground fact contradiction.
+
+    Socrates is known to be human via entity_type, so the checker can infer
+    he falls under the universal rule 'All humans are mortal'.
+    """
     # Universal rule: All humans are mortal
     universal = LogicalForm(
         context_id="test",
@@ -173,11 +177,11 @@ def test_detect_universal_ground_contradiction(consistency_checker, encoder, mem
         source_text="All humans are mortal"
     )
 
-    # Ground fact: Socrates is not mortal
+    # Ground fact: Socrates is not mortal (entity_type="humans" links him to the rule)
     ground = LogicalForm(
         context_id="test",
         logical_type=LogicalType.GROUND_FACT,
-        subject=Entity(name="socrates"),
+        subject=Entity(name="socrates", entity_type="humans"),
         predicate=Relation(verb="is"),
         object=Entity(name="mortal"),
         polarity=Polarity.NEGATIVE,
@@ -486,7 +490,7 @@ def test_severity_high_for_universal_contradictions(
     ground = LogicalForm(
         context_id="test",
         logical_type=LogicalType.GROUND_FACT,
-        subject=Entity(name="socrates"),
+        subject=Entity(name="socrates", entity_type="humans"),
         predicate=Relation(verb="is"),
         object=Entity(name="mortal"),
         polarity=Polarity.NEGATIVE,

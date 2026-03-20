@@ -7,7 +7,7 @@ from glcs.simple_models import LogicalStatement, LogicalType
 from glcs.memory import SimpleMemory
 
 
-class ConsistencyChecker:
+class SimpleConsistencyChecker:
     """Check logical consistency of statements
 
     This checker validates new statements against stored knowledge

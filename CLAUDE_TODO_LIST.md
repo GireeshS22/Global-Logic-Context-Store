@@ -96,7 +96,7 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 21 | Universal-ground check is logically broken | `consistency_checker.py:396-424` | Only checks `rule.object.name == fact.object.name` with opposite polarity. Does NOT verify the fact's subject is an instance of the rule's subject class. Ignores the predicate entirely. "All dogs eat meat" vs "Cats don't eat meat" -> false positive. "All birds fly" vs "Rocks don't fly" -> false positive. |
+| 21 | ~~Universal-ground check is logically broken~~ | ~~`consistency_checker.py:396-424`~~ | **FIXED** Added predicate verb check (with copula normalization so "are"/"is" are equivalent), fixed object/unary-predicate handling, and added subject class membership check via exact name match or `entity_type`. Updated 2 tests that used mismatched predicates without `entity_type`. |
 | 22 | Polarity check is trivially narrow | `consistency_checker.py:286-320` | Requires BOTH exact structural match (same subject/predicate/object names) AND high embedding similarity. Can only catch the trivial case of exact same words with "not" added. Any paraphrase contradiction is missed. |
 | 23 | O(n^2) pairwise comparisons | `consistency_checker.py:263-268, 447-452` | No indexing, batching, or early exit. 1000 forms = 500K comparisons. Embedding comparisons should be a single matrix multiply. |
 
@@ -208,10 +208,10 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 1 | 62 |
-| **Total** | **83** | **21** | **62** |
+| Tier 3: Engineering Quality | 63 | 2 | 61 |
+| **Total** | **83** | **22** | **61** |
 
 ---
 
-**Last Updated:** 2026-03-19 (Tier 2 complete — 10/10 fixed)
+**Last Updated:** 2026-03-20 (Tier 3 started — #21 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)

@@ -43,6 +43,20 @@ from glcs.utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+# Copula verb forms treated as equivalent for predicate matching.
+# "All humans ARE mortal" vs "Socrates IS not mortal" should be compared.
+_COPULA_VERBS: frozenset = frozenset({"is", "are", "was", "were", "be", "been", "being", "am"})
+
+
+def _verbs_match(verb1: str, verb2: str) -> bool:
+    """Return True if two verbs describe the same predicate relation."""
+    if verb1 == verb2:
+        return True
+    # Treat all copula forms as the same verb
+    if verb1 in _COPULA_VERBS and verb2 in _COPULA_VERBS:
+        return True
+    return False
+
 
 class ConsistencyChecker:
     """
@@ -393,36 +407,57 @@ class ConsistencyChecker:
         if fact.logical_type != LogicalType.GROUND_FACT:
             return None
 
-        # Check if fact violates rule
-        # Rule: "All X are Y" (subject=X, object=Y, polarity=POSITIVE)
-        # Fact: "a is not Y" (object=Y, polarity=NEGATIVE) where 'a' is an X
-        # This is a simplified check - full implementation would need
-        # to verify that 'a' is indeed an instance of X
+        # Check if fact violates rule.
+        # Rule: "All X verb Y" (subject=X, predicate=verb, object=Y, polarity=POSITIVE)
+        # Fact: "a not verb Y" (subject=a, predicate=verb, object=Y, polarity=NEGATIVE)
+        # A violation requires: opposite polarity, same predicate, same object (or both
+        # unary), and the fact's subject must belong to the rule's subject class.
+        #
+        # Subject class membership: without a type hierarchy/ontology we cannot perform
+        # deep instance-of inference (e.g. "Socrates is-a human").  We check:
+        #   (a) exact name match — fact.subject.name == rule.subject.name
+        #   (b) entity_type match — fact.subject.entity_type == rule.subject.name
+        # Cross-class contradictions that require external type knowledge are NOT detected.
 
         # Must have opposite polarities
         if rule.polarity == fact.polarity:
             return None
 
-        # Check if fact's object matches rule's object (same category)
-        if rule.object and fact.object:
-            if rule.object.name == fact.object.name:
-                # Potential violation
-                severity = "HIGH"  # Universal rule violations are serious
+        # Predicate (verb) must match (copula forms treated as equivalent)
+        if not _verbs_match(rule.predicate.verb, fact.predicate.verb):
+            return None
 
-                explanation = (
-                    f"Universal rule contradiction: "
-                    f"Universal rule '{rule.source_text}' ({rule.polarity.value}) "
-                    f"is contradicted by ground fact '{fact.source_text}' ({fact.polarity.value})"
-                )
+        # Object must match, or both must be absent (unary predicate)
+        if rule.object is not None and fact.object is not None:
+            if rule.object.name != fact.object.name:
+                return None
+        elif rule.object is not None or fact.object is not None:
+            # One has an object and the other doesn't — different relations
+            return None
 
-                return Violation(
-                    violation_type="UNIVERSAL_GROUND_CONTRADICTION",
-                    conflicting_forms=[rule.form_id, fact.form_id],
-                    severity=severity,
-                    explanation=explanation
-                )
+        # Subject class membership check
+        subject_match = (rule.subject.name == fact.subject.name)
+        if not subject_match and fact.subject.entity_type is not None:
+            subject_match = (
+                fact.subject.entity_type.strip().lower() == rule.subject.name
+            )
 
-        return None
+        if not subject_match:
+            return None
+
+        severity = "HIGH"  # Universal rule violations are serious
+        explanation = (
+            f"Universal rule contradiction: "
+            f"Universal rule '{rule.source_text}' ({rule.polarity.value}) "
+            f"is contradicted by ground fact '{fact.source_text}' ({fact.polarity.value})"
+        )
+
+        return Violation(
+            violation_type="UNIVERSAL_GROUND_CONTRADICTION",
+            conflicting_forms=[rule.form_id, fact.form_id],
+            severity=severity,
+            explanation=explanation
+        )
 
     # ========================================================================
     # REDUNDANCY DETECTION

@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any, List, Tuple, Union
 from dotenv import load_dotenv
 from glcs.parser import SimpleParser
 from glcs.memory import SimpleMemory
-from glcs.checker import ConsistencyChecker
+from glcs.checker import SimpleConsistencyChecker
 from glcs.simple_models import LogicalStatement, LogicalType
 from glcs.providers import (
     LLMProvider,
@@ -89,7 +89,7 @@ class GLCSWrapper:
         self.parser = SimpleParser()
         memory_path = memory_path or self.config.get_memory_config().get('persist_path')
         self.memory = SimpleMemory(persist_path=memory_path)
-        self.checker = ConsistencyChecker(self.memory)
+        self.checker = SimpleConsistencyChecker(self.memory)
 
         # Conversation history
         self.history: List[Dict[str, str]] = []

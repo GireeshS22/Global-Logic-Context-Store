@@ -30,7 +30,7 @@ from chromadb.config import Settings
 import numpy as np
 
 from glcs.core.models import LogicalForm
-from glcs.utils.exceptions import MemoryError as GLCSMemoryError, format_exception_message
+from glcs.utils.exceptions import GLCSMemoryError, format_exception_message
 from glcs.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -157,8 +157,10 @@ class MemoryManager:
                 "logical_type": form.logical_type.value,
                 "polarity": form.polarity.value,
                 "subject_name": form.subject.name,
+                "subject_entity_type": form.subject.entity_type or "",
                 "predicate_verb": form.predicate.verb,
                 "object_name": form.object.name if form.object else "",
+                "object_entity_type": (form.object.entity_type or "") if form.object else "",
                 "confidence_score": form.confidence_score,
                 "timestamp": form.timestamp.isoformat()
             }
@@ -256,8 +258,10 @@ class MemoryManager:
                 "logical_type": form.logical_type.value,
                 "polarity": form.polarity.value,
                 "subject_name": form.subject.name,
+                "subject_entity_type": form.subject.entity_type or "",
                 "predicate_verb": form.predicate.verb,
                 "object_name": form.object.name if form.object else "",
+                "object_entity_type": (form.object.entity_type or "") if form.object else "",
                 "confidence_score": form.confidence_score,
                 "timestamp": form.timestamp.isoformat()
             }
@@ -400,7 +404,7 @@ class MemoryManager:
         except Exception as e:
             raise GLCSMemoryError(f"Failed to search similar forms: {str(e)} (top_k: {top_k})")
 
-    def search_by_entity(self, entity_name: str) -> List[LogicalForm]:
+    def search_by_entity(self, entity_name: str, context_id: Optional[str] = None) -> List[LogicalForm]:
         """
         Search for LogicalForms mentioning a specific entity.
 
@@ -420,14 +424,20 @@ class MemoryManager:
             # Note: ChromaDB doesn't support OR queries directly, so we do two queries
 
             # Search as subject
+            where_subject = {"subject_name": entity_name}
+            if context_id:
+                where_subject = {"$and": [{"subject_name": entity_name}, {"context_id": context_id}]}
             result_subject = self.collection.get(
-                where={"subject_name": entity_name},
+                where=where_subject,
                 include=["embeddings", "metadatas", "documents"]
             )
 
             # Search as object
+            where_object = {"object_name": entity_name}
+            if context_id:
+                where_object = {"$and": [{"object_name": entity_name}, {"context_id": context_id}]}
             result_object = self.collection.get(
-                where={"object_name": entity_name},
+                where=where_object,
                 include=["embeddings", "metadatas", "documents"]
             )
 
@@ -665,9 +675,18 @@ class MemoryManager:
         from glcs.core.models import Entity, Relation, LogicalType, Polarity
 
         # Reconstruct entity and relation objects
-        subject = Entity(name=metadata["subject_name"])
+        subject = Entity(
+            name=metadata["subject_name"],
+            entity_type=metadata.get("subject_entity_type") or None
+        )
         predicate = Relation(verb=metadata["predicate_verb"])
-        obj = Entity(name=metadata["object_name"]) if metadata["object_name"] else None
+        obj = (
+            Entity(
+                name=metadata["object_name"],
+                entity_type=metadata.get("object_entity_type") or None
+            )
+            if metadata["object_name"] else None
+        )
 
         # Create LogicalForm
         form = LogicalForm(

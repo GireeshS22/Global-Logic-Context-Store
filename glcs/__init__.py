@@ -7,7 +7,7 @@ A practical tool for detecting logical contradictions in LLM conversations.
 from glcs.simple_models import LogicalStatement, LogicalType
 from glcs.parser import SimpleParser
 from glcs.memory import SimpleMemory
-from glcs.checker import ConsistencyChecker
+from glcs.checker import SimpleConsistencyChecker
 from glcs.llm_wrapper import GLCSWrapper
 
 # Advanced implementation (Stage 1.5) - available via glcs.core and glcs.advanced_wrapper
@@ -21,6 +21,6 @@ __all__ = [
     "LogicalType",
     "SimpleParser",
     "SimpleMemory",
-    "ConsistencyChecker",
+    "SimpleConsistencyChecker",
     "GLCSWrapper",
 ]

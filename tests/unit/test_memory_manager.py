@@ -29,7 +29,7 @@ from glcs.core.models import (
     LogicalType,
     Polarity
 )
-from glcs.utils.exceptions import MemoryError as GLCSMemoryError
+from glcs.utils.exceptions import GLCSMemoryError
 
 
 # ============================================================================

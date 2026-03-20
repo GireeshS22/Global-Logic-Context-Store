@@ -24,7 +24,7 @@ from glcs.core import (
     ConsistencyReport,
 )
 from glcs.utils.logger import get_logger
-from glcs.utils.exceptions import ParsingError, MemoryError, ConsistencyError
+from glcs.utils.exceptions import ParsingError, GLCSMemoryError, ConsistencyError
 
 logger = get_logger(__name__)
 

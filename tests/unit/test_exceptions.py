@@ -16,7 +16,7 @@ import pytest
 from glcs.utils.exceptions import (
     GLCSException,
     ConfigurationError,
-    MemoryError,
+    GLCSMemoryError,
     ConsistencyError,
     ValidationError,
     ParsingError,
@@ -42,9 +42,9 @@ def test_configuration_error_raised():
 
 
 def test_memory_error_raised():
-    """Test MemoryError can be raised and caught."""
-    with pytest.raises(MemoryError) as exc_info:
-        raise MemoryError("Memory operation failed")
+    """Test GLCSMemoryError can be raised and caught."""
+    with pytest.raises(GLCSMemoryError) as exc_info:
+        raise GLCSMemoryError("Memory operation failed")
 
     assert "Memory operation failed" in str(exc_info.value)
     assert isinstance(exc_info.value, GLCSException)
@@ -81,7 +81,7 @@ def test_exception_inheritance():
     """Test all exceptions inherit from GLCSException."""
     exceptions = [
         ConfigurationError("test"),
-        MemoryError("test"),
+        GLCSMemoryError("test"),
         ConsistencyError("test"),
         ValidationError("test"),
         ParsingError("test")
@@ -111,7 +111,7 @@ def test_catch_base_glcs_exception():
         if error_type == "config":
             raise ConfigurationError("Config error")
         elif error_type == "memory":
-            raise MemoryError("Memory error")
+            raise GLCSMemoryError("Memory error")
         elif error_type == "validation":
             raise ValidationError("Validation error")
 
@@ -131,7 +131,7 @@ def test_exception_messages():
     exceptions = [
         GLCSException(test_message),
         ConfigurationError(test_message),
-        MemoryError(test_message),
+        GLCSMemoryError(test_message),
         ConsistencyError(test_message),
         ValidationError(test_message),
         ParsingError(test_message)
@@ -228,7 +228,7 @@ def test_exception_class_names():
     """Test exception class names are correct."""
     assert GLCSException.__name__ == "GLCSException"
     assert ConfigurationError.__name__ == "ConfigurationError"
-    assert MemoryError.__name__ == "MemoryError"
+    assert GLCSMemoryError.__name__ == "GLCSMemoryError"
     assert ConsistencyError.__name__ == "ConsistencyError"
     assert ValidationError.__name__ == "ValidationError"
     assert ParsingError.__name__ == "ParsingError"
