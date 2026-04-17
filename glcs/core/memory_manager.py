@@ -151,19 +151,7 @@ class MemoryManager:
             )
 
         try:
-            # Prepare metadata for filtering
-            metadata = {
-                "context_id": form.context_id,
-                "logical_type": form.logical_type.value,
-                "polarity": form.polarity.value,
-                "subject_name": form.subject.name,
-                "subject_entity_type": form.subject.entity_type or "",
-                "predicate_verb": form.predicate.verb,
-                "object_name": form.object.name if form.object else "",
-                "object_entity_type": (form.object.entity_type or "") if form.object else "",
-                "confidence_score": form.confidence_score,
-                "timestamp": form.timestamp.isoformat()
-            }
+            metadata = self._build_metadata(form)
 
             # Store in ChromaDB
             self.collection.add(
@@ -252,19 +240,7 @@ class MemoryManager:
             raise GLCSMemoryError(f"Cannot update form without embedding. (form_id: {form_id})")
 
         try:
-            # Prepare metadata
-            metadata = {
-                "context_id": form.context_id,
-                "logical_type": form.logical_type.value,
-                "polarity": form.polarity.value,
-                "subject_name": form.subject.name,
-                "subject_entity_type": form.subject.entity_type or "",
-                "predicate_verb": form.predicate.verb,
-                "object_name": form.object.name if form.object else "",
-                "object_entity_type": (form.object.entity_type or "") if form.object else "",
-                "confidence_score": form.confidence_score,
-                "timestamp": form.timestamp.isoformat()
-            }
+            metadata = self._build_metadata(form)
 
             # Update in ChromaDB
             self.collection.update(
@@ -523,15 +499,25 @@ class MemoryManager:
             >>> print(f"Found {len(contexts)} contexts: {contexts}")
         """
         try:
-            # Get all forms
-            result = self.collection.get(include=["metadatas"])
+            # Paginate through metadata to avoid a single huge allocation (#35).
+            # At most _PAGE_SIZE records are in memory at any point.
+            _PAGE_SIZE = 1000
+            contexts: set = set()
+            offset = 0
+            while True:
+                result = self.collection.get(
+                    include=["metadatas"],
+                    limit=_PAGE_SIZE,
+                    offset=offset,
+                )
+                batch = result.get("metadatas") or []
+                for metadata in batch:
+                    contexts.add(metadata["context_id"])
+                if len(batch) < _PAGE_SIZE:
+                    break
+                offset += _PAGE_SIZE
 
-            # Extract unique context IDs
-            contexts = set()
-            for metadata in result["metadatas"]:
-                contexts.add(metadata["context_id"])
-
-            context_list = sorted(list(contexts))
+            context_list = sorted(contexts)
             logger.debug(f"Found {len(context_list)} contexts")
             return context_list
 
@@ -591,38 +577,40 @@ class MemoryManager:
             >>> print(f"Average confidence: {stats['avg_confidence']:.2f}")
         """
         try:
-            forms = self.get_forms_by_context(context_id)
+            # Query metadata only — no embeddings or documents needed (#36).
+            # This avoids reconstructing full LogicalForm objects with numpy arrays.
+            result = self.collection.get(
+                where={"context_id": context_id},
+                include=["metadatas"],
+            )
+            metadatas = result.get("metadatas") or []
 
-            if not forms:
+            if not metadatas:
                 return {
                     "total_forms": 0,
                     "logical_types": {},
                     "polarities": {},
-                    "avg_confidence": 0.0
+                    "avg_confidence": 0.0,
                 }
 
-            # Calculate statistics
-            logical_types = {}
-            polarities = {}
+            logical_types: dict = {}
+            polarities: dict = {}
             total_confidence = 0.0
 
-            for form in forms:
-                # Count logical types
-                lt = form.logical_type.value
+            for meta in metadatas:
+                lt = meta["logical_type"]
                 logical_types[lt] = logical_types.get(lt, 0) + 1
 
-                # Count polarities
-                pol = form.polarity.value
+                pol = meta["polarity"]
                 polarities[pol] = polarities.get(pol, 0) + 1
 
-                # Sum confidence
-                total_confidence += form.confidence_score
+                total_confidence += meta.get("confidence_score", 0.0)
 
             stats = {
-                "total_forms": len(forms),
+                "total_forms": len(metadatas),
                 "logical_types": logical_types,
                 "polarities": polarities,
-                "avg_confidence": total_confidence / len(forms) if forms else 0.0
+                "avg_confidence": total_confidence / len(metadatas),
             }
 
             logger.debug(f"Generated stats for context '{context_id}': {stats}")
@@ -648,6 +636,28 @@ class MemoryManager:
     # HELPER METHODS
     # ========================================================================
 
+    def _build_metadata(self, form: LogicalForm) -> Dict:
+        """Build a ChromaDB-compatible metadata dict from a LogicalForm.
+
+        Scalar fields (context_id, logical_type, etc.) are stored for fast
+        WHERE-clause filtering.  The full form is also stored as a JSON string
+        so that _reconstruct_form can do a lossless round-trip (#41, #42).
+        """
+        return {
+            "context_id": form.context_id,
+            "logical_type": form.logical_type.value,
+            "polarity": form.polarity.value,
+            "subject_name": form.subject.name,
+            "subject_entity_type": form.subject.entity_type or "",
+            "predicate_verb": form.predicate.verb,
+            "object_name": form.object.name if form.object else "",
+            "object_entity_type": (form.object.entity_type or "") if form.object else "",
+            "confidence_score": form.confidence_score,
+            "timestamp": form.timestamp.isoformat(),
+            # Full serialisation (embedding excluded — stored as the native vector).
+            "form_json": form.model_dump_json(exclude={"embedding"}),
+        }
+
     def _reconstruct_form(
         self,
         form_id: UUID,
@@ -655,26 +665,24 @@ class MemoryManager:
         metadata: Dict,
         source_text: str
     ) -> LogicalForm:
+        """Reconstruct a LogicalForm from ChromaDB storage.
+
+        When form_json is present (all forms stored after #41 was fixed) the
+        reconstruction is lossless — entity IDs, relation IDs, relation_type,
+        and all metadata dicts are restored exactly.  For legacy records written
+        before that fix a best-effort reconstruction from the scalar metadata
+        fields is used as a fallback.
         """
-        Reconstruct a LogicalForm from ChromaDB storage.
+        if "form_json" in metadata:
+            form = LogicalForm.model_validate_json(metadata["form_json"])
+            form.form_id = form_id  # use ChromaDB's authoritative ID
+            form.embedding = embedding
+            return form
 
-        Note: This is a simplified reconstruction. In a full implementation,
-        we would store the complete LogicalForm as JSON and reconstruct it.
-        For the MVP, we reconstruct from metadata.
-
-        Args:
-            form_id: Form UUID
-            embedding: 768-dim embedding
-            metadata: Metadata dict from ChromaDB
-            source_text: Original text
-
-        Returns:
-            Reconstructed LogicalForm
-        """
+        # Legacy fallback: reconstruct from scalar metadata fields only.
         from datetime import datetime
         from glcs.core.models import Entity, Relation, LogicalType, Polarity
 
-        # Reconstruct entity and relation objects
         subject = Entity(
             name=metadata["subject_name"],
             entity_type=metadata.get("subject_entity_type") or None
@@ -687,8 +695,6 @@ class MemoryManager:
             )
             if metadata["object_name"] else None
         )
-
-        # Create LogicalForm
         form = LogicalForm(
             context_id=metadata["context_id"],
             logical_type=LogicalType(metadata["logical_type"]),
@@ -699,10 +705,7 @@ class MemoryManager:
             source_text=source_text,
             confidence_score=metadata["confidence_score"]
         )
-
-        # Override auto-generated fields
         form.form_id = form_id
         form.timestamp = datetime.fromisoformat(metadata["timestamp"])
         form.embedding = embedding
-
         return form

@@ -26,13 +26,18 @@ Usage:
     ...         print(f"{violation.severity}: {violation.explanation}")
 """
 
+from collections import defaultdict
 from typing import List, Optional, Tuple
 from uuid import UUID
+
+import numpy as np
 
 from glcs.core.models import (
     LogicalForm,
     LogicalType,
     Polarity,
+    ViolationType,
+    Severity,
     Violation,
     ConsistencyReport
 )
@@ -140,7 +145,6 @@ class ConsistencyChecker:
                 # Empty context is consistent
                 return ConsistencyReport(
                     context_id=context_id,
-                    is_consistent=True,
                     violations=[],
                     total_forms_checked=0
                 )
@@ -162,7 +166,6 @@ class ConsistencyChecker:
             # Create report
             report = ConsistencyReport(
                 context_id=context_id,
-                is_consistent=(len(violations) == 0),
                 violations=violations,
                 total_forms_checked=len(forms)
             )
@@ -212,7 +215,6 @@ class ConsistencyChecker:
                 # No existing forms, new form is consistent
                 return ConsistencyReport(
                     context_id=context_id,
-                    is_consistent=True,
                     violations=[],
                     total_forms_checked=1
                 )
@@ -238,7 +240,6 @@ class ConsistencyChecker:
 
             report = ConsistencyReport(
                 context_id=context_id,
-                is_consistent=(len(violations) == 0),
                 violations=violations,
                 total_forms_checked=len(existing_forms) + 1
             )
@@ -266,19 +267,69 @@ class ConsistencyChecker:
             "Socrates is not mortal" (NEGATIVE)
             -> CONTRADICTION
 
+        Vectorised implementation: forms are grouped by subject name, then a
+        single matrix multiply (pos_embeddings @ neg_embeddings.T) computes all
+        cross-polarity similarities at once.  This is O(p*q*d) via BLAS rather
+        than O(p*q) sequential dot products, and avoids comparing forms that
+        cannot possibly contradict (different subjects, same polarity).
+
         Args:
             forms: List of LogicalForms to check
 
         Returns:
             List of Violation objects for contradictions found
         """
-        violations = []
+        if len(forms) < 2:
+            return []
 
-        for i, form1 in enumerate(forms):
-            for form2 in forms[i+1:]:
-                violation = self._check_polarity_contradiction(form1, form2)
-                if violation:
-                    violations.append(violation)
+        violations: List[Violation] = []
+
+        # Group by subject name — contradictions require the same subject.
+        # Subject names are normalised to lowercase by Entity.normalize_name.
+        by_subject: dict = defaultdict(list)
+        for form in forms:
+            by_subject[form.subject.name].append(form)
+
+        for subject_forms in by_subject.values():
+            positives = [
+                f for f in subject_forms
+                if f.polarity == Polarity.POSITIVE and f.embedding is not None
+            ]
+            negatives = [
+                f for f in subject_forms
+                if f.polarity == Polarity.NEGATIVE and f.embedding is not None
+            ]
+
+            if not positives or not negatives:
+                continue
+
+            # Single matrix multiply: (p × d) @ (d × q) → (p × q).
+            # Embeddings are L2-normalised so dot product == cosine similarity.
+            pos_matrix = np.vstack([f.embedding for f in positives])  # (p, d)
+            neg_matrix = np.vstack([f.embedding for f in negatives])  # (q, d)
+            sim_matrix = pos_matrix @ neg_matrix.T                    # (p, q)
+
+            rows, cols = np.where(sim_matrix >= 0.8)
+            for r, c in zip(rows, cols):
+                form1 = positives[r]
+                form2 = negatives[c]
+                similarity = float(sim_matrix[r, c])
+                severity = self._calculate_severity(
+                    violation_type=ViolationType.POLARITY_CONTRADICTION,
+                    form1=form1,
+                    form2=form2
+                )
+                explanation = (
+                    f"Polarity contradiction detected (similarity: {similarity:.2f}): "
+                    f"'{form1.source_text}' ({form1.polarity.value}) contradicts "
+                    f"'{form2.source_text}' ({form2.polarity.value})"
+                )
+                violations.append(Violation(
+                    violation_type=ViolationType.POLARITY_CONTRADICTION,
+                    conflicting_forms=[form1.form_id, form2.form_id],
+                    severity=severity,
+                    explanation=explanation
+                ))
 
         return violations
 
@@ -301,11 +352,16 @@ class ConsistencyChecker:
         if form1.polarity == form2.polarity:
             return None
 
-        # Must be semantically similar (same subject, predicate, object)
-        if not self._are_structurally_similar(form1, form2):
+        # Must share the same subject — entity names are normalised to lowercase
+        # by the model validator, so this comparison is case-insensitive.
+        # We intentionally do NOT require predicate/object name equality here:
+        # paraphrase contradictions ("John is tall" vs "John lacks height") have
+        # the same subject and opposite polarity but different verbs/objects.
+        # The embedding similarity check below is the primary semantic gate.
+        if form1.subject.name != form2.subject.name:
             return None
 
-        # Must have high semantic similarity
+        # Must have high semantic similarity (primary semantic gate)
         if form1.embedding is None or form2.embedding is None:
             return None
 
@@ -313,7 +369,7 @@ class ConsistencyChecker:
 
         if similarity >= 0.8:  # High similarity threshold for contradictions
             severity = self._calculate_severity(
-                violation_type="POLARITY_CONTRADICTION",
+                violation_type=ViolationType.POLARITY_CONTRADICTION,
                 form1=form1,
                 form2=form2
             )
@@ -325,7 +381,7 @@ class ConsistencyChecker:
             )
 
             return Violation(
-                violation_type="POLARITY_CONTRADICTION",
+                violation_type=ViolationType.POLARITY_CONTRADICTION,
                 conflicting_forms=[form1.form_id, form2.form_id],
                 severity=severity,
                 explanation=explanation
@@ -445,7 +501,7 @@ class ConsistencyChecker:
         if not subject_match:
             return None
 
-        severity = "HIGH"  # Universal rule violations are serious
+        severity = Severity.HIGH  # Universal rule violations are serious
         explanation = (
             f"Universal rule contradiction: "
             f"Universal rule '{rule.source_text}' ({rule.polarity.value}) "
@@ -453,7 +509,7 @@ class ConsistencyChecker:
         )
 
         return Violation(
-            violation_type="UNIVERSAL_GROUND_CONTRADICTION",
+            violation_type=ViolationType.UNIVERSAL_GROUND_CONTRADICTION,
             conflicting_forms=[rule.form_id, fact.form_id],
             severity=severity,
             explanation=explanation
@@ -468,8 +524,9 @@ class ConsistencyChecker:
         Check for redundant (duplicate) forms.
 
         Redundancy types:
-        - Exact: Identical source text
-        - Semantic: High cosine similarity (>= threshold)
+        - Exact: Identical source text  (detected via O(n) dict grouping)
+        - Semantic: High cosine similarity >= threshold with same polarity
+                    (detected via one matrix multiply per polarity group)
 
         Args:
             forms: List of LogicalForms to check
@@ -477,13 +534,66 @@ class ConsistencyChecker:
         Returns:
             List of Violation objects for redundancies found
         """
-        violations = []
+        if len(forms) < 2:
+            return []
 
-        for i, form1 in enumerate(forms):
-            for form2 in forms[i+1:]:
-                violation = self._check_redundancy(form1, form2)
-                if violation:
-                    violations.append(violation)
+        violations: List[Violation] = []
+
+        # --- Exact redundancy: O(n) dict grouping ---
+        # Collect all pairs that share identical (normalised) source text.
+        exact_pairs: set = set()
+        by_text: dict = defaultdict(list)
+        for form in forms:
+            by_text[form.source_text.strip().lower()].append(form)
+
+        for group in by_text.values():
+            for i, form1 in enumerate(group):
+                for form2 in group[i + 1:]:
+                    exact_pairs.add((form1.form_id, form2.form_id))
+                    violations.append(Violation(
+                        violation_type=ViolationType.EXACT_REDUNDANCY,
+                        conflicting_forms=[form1.form_id, form2.form_id],
+                        severity=Severity.LOW,
+                        explanation=(
+                            f"Exact redundancy: '{form1.source_text}' is duplicated"
+                        )
+                    ))
+
+        # --- Semantic redundancy: one matrix multiply per polarity group ---
+        # Semantic redundancy requires the same polarity; different-polarity
+        # near-duplicates are polarity contradictions, not redundancies.
+        for polarity in (Polarity.POSITIVE, Polarity.NEGATIVE):
+            group = [
+                f for f in forms
+                if f.polarity == polarity and f.embedding is not None
+            ]
+            if len(group) < 2:
+                continue
+
+            emb_matrix = np.vstack([f.embedding for f in group])     # (m, d)
+            sim_matrix = emb_matrix @ emb_matrix.T                   # (m, m)
+
+            # Upper triangle only (i < j) — avoids self-pairs and duplicates.
+            rows, cols = np.where(np.triu(sim_matrix >= self.redundancy_threshold, k=1))
+            for r, c in zip(rows, cols):
+                form1 = group[r]
+                form2 = group[c]
+
+                # Skip pairs already reported as exact redundancy.
+                if (form1.form_id, form2.form_id) in exact_pairs:
+                    continue
+
+                similarity = float(sim_matrix[r, c])
+                violations.append(Violation(
+                    violation_type=ViolationType.SEMANTIC_REDUNDANCY,
+                    conflicting_forms=[form1.form_id, form2.form_id],
+                    severity=Severity.LOW,
+                    explanation=(
+                        f"Semantic redundancy detected (similarity: {similarity:.2f}): "
+                        f"'{form1.source_text}' and '{form2.source_text}' "
+                        f"have very similar meanings"
+                    )
+                ))
 
         return violations
 
@@ -505,9 +615,9 @@ class ConsistencyChecker:
         # Check exact redundancy (identical source text)
         if form1.source_text.strip().lower() == form2.source_text.strip().lower():
             return Violation(
-                violation_type="EXACT_REDUNDANCY",
+                violation_type=ViolationType.EXACT_REDUNDANCY,
                 conflicting_forms=[form1.form_id, form2.form_id],
-                severity="LOW",  # Exact duplicates are low severity
+                severity=Severity.LOW,  # Exact duplicates are low severity
                 explanation=(
                     f"Exact redundancy: '{form1.source_text}' is duplicated"
                 )
@@ -525,9 +635,9 @@ class ConsistencyChecker:
                 return None  # Different polarity = not redundant
 
             return Violation(
-                violation_type="SEMANTIC_REDUNDANCY",
+                violation_type=ViolationType.SEMANTIC_REDUNDANCY,
                 conflicting_forms=[form1.form_id, form2.form_id],
-                severity="LOW",  # Semantic redundancy is low severity
+                severity=Severity.LOW,  # Semantic redundancy is low severity
                 explanation=(
                     f"Semantic redundancy detected (similarity: {similarity:.2f}): "
                     f"'{form1.source_text}' and '{form2.source_text}' "
@@ -576,10 +686,10 @@ class ConsistencyChecker:
 
     def _calculate_severity(
         self,
-        violation_type: str,
+        violation_type: ViolationType,
         form1: LogicalForm,
         form2: LogicalForm
-    ) -> str:
+    ) -> Severity:
         """
         Calculate violation severity.
 
@@ -594,29 +704,28 @@ class ConsistencyChecker:
             form2: Second conflicting form
 
         Returns:
-            Severity level: "HIGH", "MEDIUM", or "LOW"
+            Severity enum value
         """
         # Redundancies are always LOW
         if "REDUNDANCY" in violation_type:
-            return "LOW"
+            return Severity.LOW
 
         # Universal rule violations are always HIGH
-        if violation_type == "UNIVERSAL_GROUND_CONTRADICTION":
-            return "HIGH"
+        if violation_type == ViolationType.UNIVERSAL_GROUND_CONTRADICTION:
+            return Severity.HIGH
 
         # Polarity contradictions depend on confidence
-        if violation_type == "POLARITY_CONTRADICTION":
+        if violation_type == ViolationType.POLARITY_CONTRADICTION:
             avg_confidence = (form1.confidence_score + form2.confidence_score) / 2
 
             if avg_confidence >= 0.9:
-                return "HIGH"
+                return Severity.HIGH
             elif avg_confidence >= 0.7:
-                return "MEDIUM"
+                return Severity.MEDIUM
             else:
-                return "LOW"
+                return Severity.LOW
 
-        # Default to MEDIUM
-        return "MEDIUM"
+        return Severity.MEDIUM
 
     def get_violation_summary(self, violations: List[Violation]) -> dict:
         """

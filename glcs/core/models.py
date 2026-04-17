@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID, uuid4
 
 import numpy as np
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_serializer, field_validator
 
 
 # ============================================================================
@@ -80,6 +80,28 @@ class Polarity(str, Enum):
 
     NEGATIVE = "negative"
     """Negative statement: "X is not Y" """
+
+
+class ViolationType(str, Enum):
+    """
+    Typed enumeration of all violation categories produced by ConsistencyChecker.
+
+    Using an enum (instead of a free-form string) gives IDE autocomplete, prevents
+    typos, and makes exhaustive matching possible.
+    """
+
+    POLARITY_CONTRADICTION = "POLARITY_CONTRADICTION"
+    UNIVERSAL_GROUND_CONTRADICTION = "UNIVERSAL_GROUND_CONTRADICTION"
+    EXACT_REDUNDANCY = "EXACT_REDUNDANCY"
+    SEMANTIC_REDUNDANCY = "SEMANTIC_REDUNDANCY"
+
+
+class Severity(str, Enum):
+    """Severity level for a detected Violation."""
+
+    HIGH = "HIGH"
+    MEDIUM = "MEDIUM"
+    LOW = "LOW"
 
 
 # ============================================================================
@@ -211,10 +233,12 @@ class LogicalForm(BaseModel):
     @field_validator('embedding', mode='before')
     @classmethod
     def coerce_and_validate_embedding(cls, v: Any) -> Optional[np.ndarray]:
-        """Accept list or numpy array; validate 768-dim shape.
+        """Accept list or numpy array; validate it is a non-empty 1D array.
 
         (#14) Accepting a list means LogicalForm(**form.model_dump()) round-trips
         correctly — model_dump() serializes to list, this validator converts it back.
+        (#37) Dimension is intentionally not hard-coded here — the SemanticEncoder
+        is responsible for ensuring correct dimensions when generating embeddings.
         """
         if v is None:
             return v
@@ -222,8 +246,8 @@ class LogicalForm(BaseModel):
             v = np.array(v, dtype=np.float64)
         if not isinstance(v, np.ndarray):
             raise ValueError("Embedding must be a numpy array or list")
-        if v.shape != (768,):
-            raise ValueError(f"Embedding must be 768-dimensional, got shape {v.shape}")
+        if v.ndim != 1 or len(v) == 0:
+            raise ValueError(f"Embedding must be a non-empty 1D array, got shape {v.shape}")
         return v
 
     @field_serializer('embedding')
@@ -258,17 +282,17 @@ class Violation(BaseModel):
 
     Example:
         >>> violation = Violation(
-        ...     violation_type="CONTRADICTION",
+        ...     violation_type=ViolationType.UNIVERSAL_GROUND_CONTRADICTION,
         ...     conflicting_forms=[form1_id, form2_id],
-        ...     severity="HIGH",
+        ...     severity=Severity.HIGH,
         ...     explanation="Universal rule contradicts ground fact"
         ... )
     """
 
     violation_id: UUID = Field(default_factory=uuid4)
-    violation_type: str = Field(..., min_length=1)
+    violation_type: ViolationType
     conflicting_forms: List[UUID] = Field(..., min_length=2)
-    severity: str = Field(..., pattern="^(HIGH|MEDIUM|LOW)$")
+    severity: Severity
     explanation: str = Field(..., min_length=1)
     detected_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Dict[str, Any] = Field(default_factory=dict)
@@ -301,23 +325,13 @@ class ConsistencyReport(BaseModel):
 
     report_id: UUID = Field(default_factory=uuid4)
     context_id: str = Field(..., min_length=1)
-    is_consistent: bool
     violations: List[Violation] = Field(default_factory=list)
     total_forms_checked: int = Field(..., ge=0)
     generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    @model_validator(mode='after')
-    def validate_consistency(self) -> 'ConsistencyReport':
-        """
-        Validate that is_consistent matches the violations list.
-
-        is_consistent must be True if violations is empty, False otherwise.
-        """
-        expected_consistent = len(self.violations) == 0
-        if self.is_consistent != expected_consistent:
-            raise ValueError(
-                f"is_consistent={self.is_consistent} but violations list has "
-                f"{len(self.violations)} items. These must match."
-            )
-        return self
+    @computed_field
+    @property
+    def is_consistent(self) -> bool:
+        """True iff no violations were detected. Auto-derived — never pass manually."""
+        return len(self.violations) == 0

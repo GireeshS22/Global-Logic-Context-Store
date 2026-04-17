@@ -21,6 +21,8 @@ from glcs.core.models import (
     Relation,
     LogicalType,
     Polarity,
+    ViolationType,
+    Severity,
     LogicalForm,
     Violation,
     ConsistencyReport,
@@ -146,6 +148,51 @@ class TestPolarity:
         assert len(Polarity) == 2
 
 
+class TestViolationType:
+    """Test suite for ViolationType enum (#38)."""
+
+    def test_all_violation_types_exist(self):
+        """All four violation types produced by ConsistencyChecker must be defined."""
+        assert ViolationType.POLARITY_CONTRADICTION == "POLARITY_CONTRADICTION"
+        assert ViolationType.UNIVERSAL_GROUND_CONTRADICTION == "UNIVERSAL_GROUND_CONTRADICTION"
+        assert ViolationType.EXACT_REDUNDANCY == "EXACT_REDUNDANCY"
+        assert ViolationType.SEMANTIC_REDUNDANCY == "SEMANTIC_REDUNDANCY"
+
+    def test_violation_type_count(self):
+        assert len(ViolationType) == 4
+
+    def test_violation_type_is_string_comparable(self):
+        """str-enum values should compare equal to their string representation."""
+        assert ViolationType.POLARITY_CONTRADICTION == "POLARITY_CONTRADICTION"
+
+    def test_invalid_violation_type_rejected(self):
+        """Unrecognised violation_type strings should fail model validation."""
+        fid1 = UUID("12345678-1234-5678-1234-567812345678")
+        fid2 = UUID("87654321-4321-8765-4321-876543218765")
+        with pytest.raises(ValidationError):
+            Violation(
+                violation_type="CONTRADICTION",
+                conflicting_forms=[fid1, fid2],
+                severity="HIGH",
+                explanation="test",
+            )
+
+
+class TestSeverity:
+    """Test suite for Severity enum (#39)."""
+
+    def test_all_severities_exist(self):
+        assert Severity.HIGH == "HIGH"
+        assert Severity.MEDIUM == "MEDIUM"
+        assert Severity.LOW == "LOW"
+
+    def test_severity_count(self):
+        assert len(Severity) == 3
+
+    def test_severity_is_string_comparable(self):
+        assert Severity.HIGH == "HIGH"
+
+
 # ============================================================================
 # LOGICAL FORM MODEL TESTS
 # ============================================================================
@@ -206,9 +253,23 @@ class TestLogicalForm:
         assert form.embedding.shape == (768,)
         np.testing.assert_array_equal(form.embedding, embedding)
 
-    def test_logical_form_invalid_embedding_dimensions(self):
-        """Test that non-768-dimensional embeddings are rejected."""
-        with pytest.raises(ValidationError) as exc_info:
+    def test_logical_form_embedding_accepts_variable_dimensions(self):
+        """Embedding validator must not hard-code 768 — any 1D array is valid (#37)."""
+        for dim in [256, 512, 768, 1024]:
+            form = LogicalForm(
+                context_id="test",
+                logical_type=LogicalType.GROUND_FACT,
+                subject=Entity(name="test"),
+                predicate=Relation(verb="is"),
+                polarity=Polarity.POSITIVE,
+                source_text="test",
+                embedding=np.random.rand(dim),
+            )
+            assert form.embedding.shape == (dim,)
+
+    def test_logical_form_invalid_embedding_rejects_multidimensional(self):
+        """2D (or higher) embedding arrays must be rejected."""
+        with pytest.raises(ValidationError):
             LogicalForm(
                 context_id="test",
                 logical_type=LogicalType.GROUND_FACT,
@@ -216,9 +277,8 @@ class TestLogicalForm:
                 predicate=Relation(verb="is"),
                 polarity=Polarity.POSITIVE,
                 source_text="test",
-                embedding=np.random.rand(512),  # Wrong dimension
+                embedding=np.random.rand(768, 1),
             )
-        assert "768-dimensional" in str(exc_info.value)
 
     def test_logical_form_confidence_score_valid_range(self):
         """Test valid confidence scores (0.0 to 1.0)."""
@@ -364,17 +424,17 @@ class TestViolation:
         form_id2 = UUID("87654321-4321-8765-4321-876543218765")
 
         violation = Violation(
-            violation_type="CONTRADICTION",
+            violation_type=ViolationType.POLARITY_CONTRADICTION,
             conflicting_forms=[form_id1, form_id2],
-            severity="HIGH",
+            severity=Severity.HIGH,
             explanation="Universal rule contradicts ground fact",
         )
 
-        assert violation.violation_type == "CONTRADICTION"
+        assert violation.violation_type == ViolationType.POLARITY_CONTRADICTION
         assert len(violation.conflicting_forms) == 2
         assert form_id1 in violation.conflicting_forms
         assert form_id2 in violation.conflicting_forms
-        assert violation.severity == "HIGH"
+        assert violation.severity == Severity.HIGH
         assert "contradicts" in violation.explanation
         assert isinstance(violation.violation_id, UUID)
         assert isinstance(violation.detected_at, datetime)
@@ -384,9 +444,9 @@ class TestViolation:
         form_id1 = UUID("12345678-1234-5678-1234-567812345678")
         form_id2 = UUID("87654321-4321-8765-4321-876543218765")
 
-        for severity in ["HIGH", "MEDIUM", "LOW"]:
+        for severity in Severity:
             violation = Violation(
-                violation_type="TEST",
+                violation_type=ViolationType.POLARITY_CONTRADICTION,
                 conflicting_forms=[form_id1, form_id2],
                 severity=severity,
                 explanation="test",
@@ -400,7 +460,7 @@ class TestViolation:
 
         with pytest.raises(ValidationError):
             Violation(
-                violation_type="TEST",
+                violation_type=ViolationType.POLARITY_CONTRADICTION,
                 conflicting_forms=[form_id1, form_id2],
                 severity="CRITICAL",  # Invalid
                 explanation="test",
@@ -412,9 +472,9 @@ class TestViolation:
 
         with pytest.raises(ValidationError):
             Violation(
-                violation_type="TEST",
+                violation_type=ViolationType.POLARITY_CONTRADICTION,
                 conflicting_forms=[form_id],  # Only 1 form
-                severity="HIGH",
+                severity=Severity.HIGH,
                 explanation="test",
             )
 
@@ -427,9 +487,9 @@ class TestViolation:
         ]
 
         violation = Violation(
-            violation_type="MULTI_CONFLICT",
+            violation_type=ViolationType.EXACT_REDUNDANCY,
             conflicting_forms=form_ids,
-            severity="HIGH",
+            severity=Severity.LOW,
             explanation="Multiple forms conflict",
         )
         assert len(violation.conflicting_forms) == 3
@@ -441,9 +501,9 @@ class TestViolation:
 
         with pytest.raises(ValidationError):
             Violation(
-                violation_type="TEST",
+                violation_type=ViolationType.POLARITY_CONTRADICTION,
                 conflicting_forms=[form_id1, form_id2],
-                severity="HIGH",
+                severity=Severity.HIGH,
                 explanation="",
             )
 
@@ -460,7 +520,6 @@ class TestConsistencyReport:
         """Test creating a consistent report (no violations)."""
         report = ConsistencyReport(
             context_id="session_123",
-            is_consistent=True,
             violations=[],
             total_forms_checked=10,
         )
@@ -478,60 +537,45 @@ class TestConsistencyReport:
         form_id2 = UUID("87654321-4321-8765-4321-876543218765")
 
         violation = Violation(
-            violation_type="CONTRADICTION",
+            violation_type=ViolationType.POLARITY_CONTRADICTION,
             conflicting_forms=[form_id1, form_id2],
-            severity="HIGH",
+            severity=Severity.HIGH,
             explanation="Test violation",
         )
 
         report = ConsistencyReport(
             context_id="session_123",
-            is_consistent=False,
             violations=[violation],
             total_forms_checked=15,
         )
 
         assert report.is_consistent is False
         assert len(report.violations) == 1
-        assert report.violations[0].violation_type == "CONTRADICTION"
+        assert report.violations[0].violation_type == ViolationType.POLARITY_CONTRADICTION
 
-    def test_consistency_report_validates_consistency_flag(self):
-        """Test that is_consistent must match violations list."""
+    def test_is_consistent_auto_computed_from_violations(self):
+        """is_consistent is a computed field — auto-derived from violations (#40)."""
         form_id1 = UUID("12345678-1234-5678-1234-567812345678")
         form_id2 = UUID("87654321-4321-8765-4321-876543218765")
-
         violation = Violation(
-            violation_type="TEST",
+            violation_type=ViolationType.EXACT_REDUNDANCY,
             conflicting_forms=[form_id1, form_id2],
-            severity="HIGH",
+            severity=Severity.LOW,
             explanation="test",
         )
 
-        # Case 1: Says consistent but has violations - should FAIL
-        with pytest.raises(ValueError) as exc_info:
-            ConsistencyReport(
-                context_id="test",
-                is_consistent=True,  # WRONG: has violations
-                violations=[violation],
-                total_forms_checked=10,
-            )
-        assert "must match" in str(exc_info.value).lower()
+        # Empty violations → True
+        r1 = ConsistencyReport(context_id="ctx", violations=[], total_forms_checked=3)
+        assert r1.is_consistent is True
 
-        # Case 2: Says inconsistent but no violations - should FAIL
-        with pytest.raises(ValueError) as exc_info:
-            ConsistencyReport(
-                context_id="test",
-                is_consistent=False,  # WRONG: no violations
-                violations=[],
-                total_forms_checked=10,
-            )
-        assert "must match" in str(exc_info.value).lower()
+        # Non-empty violations → False
+        r2 = ConsistencyReport(context_id="ctx", violations=[violation], total_forms_checked=3)
+        assert r2.is_consistent is False
 
     def test_consistency_report_zero_forms_checked(self):
         """Test that total_forms_checked can be zero."""
         report = ConsistencyReport(
             context_id="empty_session",
-            is_consistent=True,
             violations=[],
             total_forms_checked=0,
         )
@@ -542,7 +586,6 @@ class TestConsistencyReport:
         with pytest.raises(ValidationError):
             ConsistencyReport(
                 context_id="test",
-                is_consistent=True,
                 violations=[],
                 total_forms_checked=-1,
             )
@@ -555,22 +598,21 @@ class TestConsistencyReport:
 
         violations = [
             Violation(
-                violation_type="CONTRADICTION",
+                violation_type=ViolationType.POLARITY_CONTRADICTION,
                 conflicting_forms=[form_id1, form_id2],
-                severity="HIGH",
+                severity=Severity.HIGH,
                 explanation="First violation",
             ),
             Violation(
-                violation_type="REDUNDANCY",
+                violation_type=ViolationType.EXACT_REDUNDANCY,
                 conflicting_forms=[form_id2, form_id3],
-                severity="LOW",
+                severity=Severity.LOW,
                 explanation="Second violation",
             ),
         ]
 
         report = ConsistencyReport(
             context_id="test",
-            is_consistent=False,
             violations=violations,
             total_forms_checked=20,
         )
@@ -581,7 +623,6 @@ class TestConsistencyReport:
         metadata = {"checker_version": "1.0", "execution_time_ms": 42}
         report = ConsistencyReport(
             context_id="test",
-            is_consistent=True,
             violations=[],
             total_forms_checked=5,
             metadata=metadata,
@@ -622,16 +663,15 @@ class TestIntegration:
 
         # Create violation for these forms
         violation = Violation(
-            violation_type="CONTRADICTION",
+            violation_type=ViolationType.UNIVERSAL_GROUND_CONTRADICTION,
             conflicting_forms=[form1.form_id, form2.form_id],
-            severity="HIGH",
+            severity=Severity.HIGH,
             explanation="Universal rule 'All humans are mortal' contradicts fact 'Socrates is immortal'",
         )
 
         # Create consistency report
         report = ConsistencyReport(
             context_id="session_abc",
-            is_consistent=False,
             violations=[violation],
             total_forms_checked=2,
         )

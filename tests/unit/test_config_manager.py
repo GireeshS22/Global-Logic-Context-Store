@@ -40,7 +40,7 @@ def test_load_config_success():
 
     # Check specific values
     assert config['memory']['vector_dimension'] == 768
-    assert config['encoder']['model_name'] == "sentence-transformers/all-MiniLM-L6-v2"
+    assert config['encoder']['model_name'] == "all-mpnet-base-v2"
 
 
 def test_load_config_file_not_found():

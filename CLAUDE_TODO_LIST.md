@@ -97,31 +97,31 @@ Carried forward from original audit. Tracks which components have been verified.
 | # | Issue | File | Details |
 |---|-------|------|---------|
 | 21 | ~~Universal-ground check is logically broken~~ | ~~`consistency_checker.py:396-424`~~ | **FIXED** Added predicate verb check (with copula normalization so "are"/"is" are equivalent), fixed object/unary-predicate handling, and added subject class membership check via exact name match or `entity_type`. Updated 2 tests that used mismatched predicates without `entity_type`. |
-| 22 | Polarity check is trivially narrow | `consistency_checker.py:286-320` | Requires BOTH exact structural match (same subject/predicate/object names) AND high embedding similarity. Can only catch the trivial case of exact same words with "not" added. Any paraphrase contradiction is missed. |
-| 23 | O(n^2) pairwise comparisons | `consistency_checker.py:263-268, 447-452` | No indexing, batching, or early exit. 1000 forms = 500K comparisons. Embedding comparisons should be a single matrix multiply. |
+| 22 | ~~Polarity check is trivially narrow~~ | ~~`consistency_checker.py:286-320`~~ | **FIXED** Replaced `_are_structurally_similar` gate with subject-name-only match. Embedding similarity (≥0.8) now acts as the sole semantic discriminator, catching paraphrase contradictions. Added 2 regression tests. |
+| 23 | ~~O(n^2) pairwise comparisons~~ | ~~`consistency_checker.py:263-268, 447-452`~~ | **FIXED** `_check_polarity_contradictions`: groups by subject then does one `pos @ neg.T` matrix multiply per group. `_check_redundancies`: exact duplicates via O(n) dict grouping; semantic duplicates via one `matrix @ matrix.T` per polarity group + `np.triu`. Added 3 tests (correctness, no-double-report, perf guard). |
 
 ### 3.2 Provider System
 
 | # | Issue | Files | Details |
 |---|-------|-------|---------|
-| 24 | String-based error classification | All 5 providers | `str(e).lower()` substring matching instead of catching SDK typed exceptions (`openai.RateLimitError`, etc.). Fragile, loses error context. |
-| 25 | Factory crashes on re-import | `glcs/providers/factory.py:28-29` | `register()` raises `ValueError` on duplicate name. If `glcs.providers` is re-imported or `clear()` is called, the factory breaks. |
-| 26 | Ollama auto-pulls models without consent | `glcs/providers/ollama_provider.py:92-103` | Constructor silently downloads multi-GB models. Dangerous in CI/CD. Should be opt-in. |
-| 27 | `validate_config()` runs after constructor | All providers | By the time validation runs, the client is already initialized with potentially invalid credentials. Validation is theater. |
-| 28 | Copy-paste providers | `openai_provider.py` ~ `groq_provider.py` | Near-identical `generate()` methods. The base class `_convert_messages()` hook exists but is unused. No actual abstraction. |
-| 29 | `print()` used instead of logging | `ollama_provider.py:93,96,248,250` | Library code should never use `print()`. Use `logger.info()`. |
-| 30 | Bare `except:` clause | `ollama_provider.py:211` | Catches everything including `KeyboardInterrupt` and `SystemExit`. Use `except Exception:`. |
-| 31 | Provider SDK packages not in `pyproject.toml` | `pyproject.toml` | `anthropic`, `google-generativeai`, `groq` are not listed as optional extras. Users cannot `pip install glcs[anthropic]`. |
+| 24 | ~~String-based error classification~~ | ~~All 5 providers~~ | **FIXED** All providers import typed SDK exceptions with `isinstance` checks; string matching is the fallback only. |
+| 25 | ~~Factory crashes on re-import~~ | ~~`glcs/providers/factory.py:28-29`~~ | **FIXED** `register()` is idempotent — same class re-registration is a no-op; different class still raises `ValueError`. |
+| 26 | ~~Ollama auto-pulls models without consent~~ | ~~`glcs/providers/ollama_provider.py:92-103`~~ | **FIXED** `auto_pull=False` by default in `config.extra`; missing model raises `ProviderError` with manual pull instructions. |
+| 27 | ~~`validate_config()` runs after constructor~~ | ~~All providers~~ | **FIXED** API key checked at START of `__init__` before SDK client is created; raises `ProviderConfigError` immediately. |
+| 28 | ~~Copy-paste providers~~ | ~~`openai_provider.py` ~ `groq_provider.py`~~ | **FIXED** Shared `generate()` extracted to `OpenAICompatibleProvider` in `base.py`; `_classify_error()` hook for typed exceptions. |
+| 29 | ~~`print()` used instead of logging~~ | ~~`ollama_provider.py:93,96,248,250`~~ | **FIXED** All `print()` replaced with `logger.info()`. |
+| 30 | ~~Bare `except:` clause~~ | ~~`ollama_provider.py:211`~~ | **FIXED** Changed to `except Exception:`. |
+| 31 | ~~Provider SDK packages not in `pyproject.toml`~~ | ~~`pyproject.toml`~~ | **FIXED** Added `openai`, `anthropic`, `groq`, `google-generativeai` as optional extras. `pip install glcs[anthropic]` and `glcs[all-providers]` now work. |
 
 ### 3.3 Thread Safety & Performance
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 32 | Thread-unsafe singleton | `glcs/core/semantic_encoder.py:62-64,96-105` | Docstring claims "thread-safe singleton" but has zero locking. Two threads can both load the 420MB model simultaneously. Add `threading.Lock`. |
-| 33 | Docstring lies about lazy loading | `glcs/core/semantic_encoder.py:75-80` | Docstring says "loaded lazily on first encode() call" but `_load_model()` is called in `__init__`. Model loads eagerly on construction. |
-| 34 | Eager imports load entire ML stack | `glcs/core/__init__.py:12-24` | Importing `Entity` from `glcs.core` triggers loading of sentence-transformers, ChromaDB, and LLM libraries. Use lazy imports. |
-| 35 | `list_contexts` fetches all forms | `memory_manager.py:521-532` | Loads every metadata dict into memory just to extract unique context IDs. Will OOM at scale. |
-| 36 | `get_context_stats` reconstructs full objects | `memory_manager.py:590` | Builds full `LogicalForm` objects (including numpy arrays) just to count types. Should query metadata only. |
+| 32 | ~~Thread-unsafe singleton~~ | ~~`glcs/core/semantic_encoder.py:62-64,96-105`~~ | **FIXED** Added `_lock: threading.Lock` at class level. `_load_model()` uses double-checked locking; `clear_model_cache()` also holds the lock. |
+| 33 | ~~Docstring lies about lazy loading~~ | ~~`glcs/core/semantic_encoder.py:75-80`~~ | **FIXED** Docstring now correctly says model loads eagerly on construction and is cached for reuse. |
+| 34 | ~~Eager imports load entire ML stack~~ | ~~`glcs/core/__init__.py:12-24`~~ | **FIXED** `glcs/core/__init__.py` now uses Python's `__getattr__` lazy-import pattern. ML libraries are only loaded on first attribute access. |
+| 35 | ~~`list_contexts` fetches all forms~~ | ~~`memory_manager.py:521-532`~~ | **FIXED** Paginates with `limit=1000`/`offset` so at most 1000 metadata dicts are in memory at once. |
+| 36 | ~~`get_context_stats` reconstructs full objects~~ | ~~`memory_manager.py:590`~~ | **FIXED** Now queries `include=["metadatas"]` only — no embeddings or documents loaded. Stats computed directly from stored metadata fields. |
 
 ### 3.4 Data Model Issues
 
@@ -208,10 +208,10 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 2 | 61 |
-| **Total** | **83** | **22** | **61** |
+| Tier 3: Engineering Quality | 63 | 17 | 46 |
+| **Total** | **83** | **37** | **46** |
 
 ---
 
-**Last Updated:** 2026-03-20 (Tier 3 started — #21 fixed)
+**Last Updated:** 2026-03-26 (Tier 3 — #21–#36 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)
