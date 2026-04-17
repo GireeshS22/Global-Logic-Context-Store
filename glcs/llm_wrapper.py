@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any, List, Tuple, Union
 from dotenv import load_dotenv
 from glcs.parser import SimpleParser
 from glcs.memory import SimpleMemory
-from glcs.checker import ConsistencyChecker
+from glcs.checker import SimpleConsistencyChecker
 from glcs.simple_models import LogicalStatement, LogicalType
 from glcs.providers import (
     LLMProvider,
@@ -89,7 +89,7 @@ class GLCSWrapper:
         self.parser = SimpleParser()
         memory_path = memory_path or self.config.get_memory_config().get('persist_path')
         self.memory = SimpleMemory(persist_path=memory_path)
-        self.checker = ConsistencyChecker(self.memory)
+        self.checker = SimpleConsistencyChecker(self.memory)
 
         # Conversation history
         self.history: List[Dict[str, str]] = []
@@ -251,16 +251,21 @@ class GLCSWrapper:
         else:
             augmented_prompt = prompt
 
-        # Add to history
+        # Add original prompt to history — keep history readable for multi-turn display.
         self.history.append({"role": "user", "content": prompt})
 
-        # Prepare messages
+        # For the actual LLM call, swap the last user message with the augmented
+        # version when context is available so the model sees known facts.
+        history_slice = list(self.history[-10:])
+        if context:
+            history_slice[-1] = {"role": "user", "content": augmented_prompt}
+
         messages = [
             {
                 "role": "system",
                 "content": "You are a helpful assistant. Be logically consistent and respect established facts."
             },
-            *self.history[-10:],  # Include last 10 messages for context
+            *history_slice,
         ]
 
         # Generate response

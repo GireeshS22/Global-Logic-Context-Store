@@ -29,7 +29,7 @@ from glcs.core.models import (
     LogicalType,
     Polarity
 )
-from glcs.utils.exceptions import MemoryError as GLCSMemoryError
+from glcs.utils.exceptions import GLCSMemoryError
 
 
 # ============================================================================
@@ -613,3 +613,105 @@ def test_form_reconstruction_preserves_data(memory_manager, encoder, sample_form
     assert retrieved.confidence_score == sample_form.confidence_score
     assert retrieved.source_text == sample_form.source_text
     assert np.allclose(retrieved.embedding, original_embedding)
+
+
+# ============================================================================
+# LOSSLESS ROUND-TRIP TESTS (#41)
+# ============================================================================
+
+def test_round_trip_preserves_entity_ids(memory_manager, encoder):
+    """store→retrieve must keep entity_id for subject and object unchanged."""
+    form = LogicalForm(
+        context_id="ctx",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="alice", entity_type="person"),
+        predicate=Relation(verb="knows"),
+        object=Entity(name="bob", entity_type="person"),
+        polarity=Polarity.POSITIVE,
+        source_text="Alice knows Bob",
+    )
+    encoder.add_embedding_to_form(form)
+    subject_id = form.subject.entity_id
+    object_id = form.object.entity_id
+
+    form_id = memory_manager.store_form(form)
+    retrieved = memory_manager.retrieve_form(form_id)
+
+    assert retrieved.subject.entity_id == subject_id
+    assert retrieved.object.entity_id == object_id
+
+
+def test_round_trip_preserves_relation_id(memory_manager, encoder):
+    """store→retrieve must keep relation_id on the predicate unchanged."""
+    form = LogicalForm(
+        context_id="ctx",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="socrates"),
+        predicate=Relation(verb="is", relation_type="property"),
+        object=Entity(name="mortal"),
+        polarity=Polarity.POSITIVE,
+        source_text="Socrates is mortal",
+    )
+    encoder.add_embedding_to_form(form)
+    predicate_id = form.predicate.relation_id
+
+    form_id = memory_manager.store_form(form)
+    retrieved = memory_manager.retrieve_form(form_id)
+
+    assert retrieved.predicate.relation_id == predicate_id
+
+
+def test_round_trip_preserves_relation_type(memory_manager, encoder):
+    """store→retrieve must restore predicate.relation_type."""
+    form = LogicalForm(
+        context_id="ctx",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="earth"),
+        predicate=Relation(verb="orbits", relation_type="spatial"),
+        object=Entity(name="sun"),
+        polarity=Polarity.POSITIVE,
+        source_text="Earth orbits Sun",
+    )
+    encoder.add_embedding_to_form(form)
+    form_id = memory_manager.store_form(form)
+    retrieved = memory_manager.retrieve_form(form_id)
+
+    assert retrieved.predicate.relation_type == "spatial"
+
+
+def test_round_trip_preserves_form_metadata(memory_manager, encoder):
+    """store→retrieve must restore form-level metadata dict."""
+    form = LogicalForm(
+        context_id="ctx",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="plato"),
+        predicate=Relation(verb="is"),
+        object=Entity(name="philosopher"),
+        polarity=Polarity.POSITIVE,
+        source_text="Plato is a philosopher",
+        metadata={"source": "wikipedia", "confidence": 0.97},
+    )
+    encoder.add_embedding_to_form(form)
+    form_id = memory_manager.store_form(form)
+    retrieved = memory_manager.retrieve_form(form_id)
+
+    assert retrieved.metadata == {"source": "wikipedia", "confidence": 0.97}
+
+
+def test_round_trip_preserves_entity_metadata(memory_manager, encoder):
+    """store→retrieve must restore metadata on subject and object entities."""
+    form = LogicalForm(
+        context_id="ctx",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="aristotle", metadata={"era": "ancient", "born": -384}),
+        predicate=Relation(verb="studied_under"),
+        object=Entity(name="plato", metadata={"role": "teacher"}),
+        polarity=Polarity.POSITIVE,
+        source_text="Aristotle studied under Plato",
+    )
+    encoder.add_embedding_to_form(form)
+    form_id = memory_manager.store_form(form)
+    retrieved = memory_manager.retrieve_form(form_id)
+
+    assert retrieved.subject.metadata == {"era": "ancient", "born": -384}
+    assert retrieved.object.metadata == {"role": "teacher"}

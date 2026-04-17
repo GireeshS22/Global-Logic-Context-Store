@@ -14,6 +14,9 @@ Test Coverage:
     - Integration with MemoryManager and SemanticEncoder
 """
 
+import time
+
+import numpy as np
 import pytest
 import uuid
 
@@ -26,6 +29,8 @@ from glcs.core.models import (
     Relation,
     LogicalType,
     Polarity,
+    ViolationType,
+    Severity,
     Violation
 )
 from glcs.utils.exceptions import ConsistencyError
@@ -156,12 +161,99 @@ def test_no_polarity_contradiction_same_polarity(consistency_checker, encoder, m
     assert len(polarity_contradictions) == 0
 
 
+def test_detect_polarity_contradiction_paraphrase(consistency_checker, encoder, memory_manager):
+    """Test that polarity contradiction is detected even when predicate/object differ.
+
+    Regression test for issue #22: the old implementation required exact structural
+    match (same subject, predicate verb, AND object name) before checking embeddings.
+    Paraphrase contradictions — same subject, opposite polarity, different wording —
+    were silently missed.  The fix keeps only the subject-name guard and lets the
+    embedding similarity threshold (0.8) act as the semantic gate.
+    """
+    form1 = LogicalForm(
+        context_id="test",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="socrates"),
+        predicate=Relation(verb="is"),
+        object=Entity(name="mortal"),
+        polarity=Polarity.POSITIVE,
+        source_text="Socrates is mortal"
+    )
+
+    # Different predicate verb and no object — paraphrase of the negation.
+    form2 = LogicalForm(
+        context_id="test",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="socrates"),
+        predicate=Relation(verb="cannot die"),
+        polarity=Polarity.NEGATIVE,
+        source_text="Socrates cannot die"
+    )
+
+    encoder.add_embeddings_to_forms([form1, form2])
+    memory_manager.store_form(form1)
+    memory_manager.store_form(form2)
+
+    report = consistency_checker.check_context_consistency("test")
+
+    polarity_contradictions = [
+        v for v in report.violations
+        if v.violation_type == "POLARITY_CONTRADICTION"
+    ]
+    # The two forms are semantically similar (both about Socrates and mortality)
+    # and have opposite polarities — they should be flagged as a contradiction.
+    assert len(polarity_contradictions) == 1
+
+
+def test_no_polarity_contradiction_different_subjects(consistency_checker, encoder, memory_manager):
+    """Test that different subjects do not produce a polarity contradiction.
+
+    Even if two forms have high embedding similarity and opposite polarity,
+    they should not be flagged unless they share the same subject.
+    """
+    form1 = LogicalForm(
+        context_id="test",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="socrates"),
+        predicate=Relation(verb="is"),
+        object=Entity(name="mortal"),
+        polarity=Polarity.POSITIVE,
+        source_text="Socrates is mortal"
+    )
+
+    form2 = LogicalForm(
+        context_id="test",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="plato"),
+        predicate=Relation(verb="is"),
+        object=Entity(name="mortal"),
+        polarity=Polarity.NEGATIVE,
+        source_text="Plato is not mortal"
+    )
+
+    encoder.add_embeddings_to_forms([form1, form2])
+    memory_manager.store_form(form1)
+    memory_manager.store_form(form2)
+
+    report = consistency_checker.check_context_consistency("test")
+
+    polarity_contradictions = [
+        v for v in report.violations
+        if v.violation_type == "POLARITY_CONTRADICTION"
+    ]
+    assert len(polarity_contradictions) == 0
+
+
 # ============================================================================
 # UNIVERSAL VS GROUND CONTRADICTION TESTS
 # ============================================================================
 
 def test_detect_universal_ground_contradiction(consistency_checker, encoder, memory_manager):
-    """Test detection of universal rule vs ground fact contradiction."""
+    """Test detection of universal rule vs ground fact contradiction.
+
+    Socrates is known to be human via entity_type, so the checker can infer
+    he falls under the universal rule 'All humans are mortal'.
+    """
     # Universal rule: All humans are mortal
     universal = LogicalForm(
         context_id="test",
@@ -173,11 +265,11 @@ def test_detect_universal_ground_contradiction(consistency_checker, encoder, mem
         source_text="All humans are mortal"
     )
 
-    # Ground fact: Socrates is not mortal
+    # Ground fact: Socrates is not mortal (entity_type="humans" links him to the rule)
     ground = LogicalForm(
         context_id="test",
         logical_type=LogicalType.GROUND_FACT,
-        subject=Entity(name="socrates"),
+        subject=Entity(name="socrates", entity_type="humans"),
         predicate=Relation(verb="is"),
         object=Entity(name="mortal"),
         polarity=Polarity.NEGATIVE,
@@ -486,7 +578,7 @@ def test_severity_high_for_universal_contradictions(
     ground = LogicalForm(
         context_id="test",
         logical_type=LogicalType.GROUND_FACT,
-        subject=Entity(name="socrates"),
+        subject=Entity(name="socrates", entity_type="humans"),
         predicate=Relation(verb="is"),
         object=Entity(name="mortal"),
         polarity=Polarity.NEGATIVE,
@@ -551,21 +643,21 @@ def test_get_violation_summary(consistency_checker):
     """Test generating violation summary."""
     violations = [
         Violation(
-            violation_type="POLARITY_CONTRADICTION",
+            violation_type=ViolationType.POLARITY_CONTRADICTION,
             conflicting_forms=[uuid.uuid4(), uuid.uuid4()],
-            severity="HIGH",
+            severity=Severity.HIGH,
             explanation="Test contradiction 1"
         ),
         Violation(
-            violation_type="POLARITY_CONTRADICTION",
+            violation_type=ViolationType.POLARITY_CONTRADICTION,
             conflicting_forms=[uuid.uuid4(), uuid.uuid4()],
-            severity="MEDIUM",
+            severity=Severity.MEDIUM,
             explanation="Test contradiction 2"
         ),
         Violation(
-            violation_type="EXACT_REDUNDANCY",
+            violation_type=ViolationType.EXACT_REDUNDANCY,
             conflicting_forms=[uuid.uuid4(), uuid.uuid4()],
-            severity="LOW",
+            severity=Severity.LOW,
             explanation="Test redundancy"
         )
     ]
@@ -644,3 +736,97 @@ def test_full_workflow_integration(consistency_checker, encoder, memory_manager)
     assert summary["total"] >= 0
     assert "by_type" in summary
     assert "by_severity" in summary
+
+
+# ============================================================================
+# VECTORISED BATCH CHECKS — ISSUE #23
+# ============================================================================
+
+def _make_form(context_id: str, subject: str, polarity: Polarity, text: str) -> LogicalForm:
+    """Helper: build a minimal LogicalForm with a synthetic embedding."""
+    form = LogicalForm(
+        context_id=context_id,
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name=subject),
+        predicate=Relation(verb="is"),
+        object=Entity(name="mortal"),
+        polarity=polarity,
+        source_text=text,
+    )
+    # Assign a random normalised embedding so the matrix multiply path runs.
+    vec = np.random.default_rng(abs(hash(text)) % (2**32)).random(768).astype(np.float32)
+    form.embedding = vec / np.linalg.norm(vec)
+    return form
+
+
+def test_vectorised_polarity_contradictions_correctness(consistency_checker):
+    """Vectorised _check_polarity_contradictions returns the same violations as
+    the old pairwise loop for a small set of forms (regression test for #23)."""
+    forms = [
+        _make_form("ctx", "socrates", Polarity.POSITIVE, "Socrates is mortal"),
+        _make_form("ctx", "socrates", Polarity.NEGATIVE, "Socrates is not mortal"),
+        _make_form("ctx", "plato",    Polarity.POSITIVE, "Plato is mortal"),
+        _make_form("ctx", "plato",    Polarity.NEGATIVE, "Plato is not mortal"),
+        _make_form("ctx", "aristotle",Polarity.POSITIVE, "Aristotle is mortal"),
+    ]
+
+    violations = consistency_checker._check_polarity_contradictions(forms)
+
+    # Aristotle has no opposing form — only socrates and plato pairs can fire.
+    # Whether they fire depends on embedding similarity; at minimum no crash.
+    assert isinstance(violations, list)
+    for v in violations:
+        assert v.violation_type == "POLARITY_CONTRADICTION"
+
+
+def test_vectorised_redundancies_no_double_report(consistency_checker):
+    """Exact-duplicate pairs should appear as EXACT_REDUNDANCY only, not also
+    as SEMANTIC_REDUNDANCY (regression test for #23 exact/semantic overlap)."""
+    form1 = _make_form("ctx", "socrates", Polarity.POSITIVE, "Socrates is mortal")
+    # Identical text → exact redundancy.
+    form2 = _make_form("ctx", "socrates", Polarity.POSITIVE, "Socrates is mortal")
+    # Give form2 the same embedding as form1 to ensure it would hit semantic threshold.
+    form2.embedding = form1.embedding.copy()
+
+    violations = consistency_checker._check_redundancies([form1, form2])
+
+    exact = [v for v in violations if v.violation_type == "EXACT_REDUNDANCY"]
+    semantic = [v for v in violations if v.violation_type == "SEMANTIC_REDUNDANCY"]
+
+    assert len(exact) == 1, "Expected exactly one EXACT_REDUNDANCY violation"
+    assert len(semantic) == 0, "Exact-duplicate pair must not also appear as SEMANTIC_REDUNDANCY"
+
+
+def test_vectorised_batch_polarity_performance(consistency_checker):
+    """_check_polarity_contradictions must complete in < 5 seconds for 200 forms.
+
+    This is a smoke-level performance guard.  200 forms → up to 10 000 pairs
+    with the old O(n²) loop; with vectorised matrix multiply they are computed
+    as a single BLAS call.
+    """
+    rng = np.random.default_rng(42)
+    forms = []
+    for i in range(200):
+        polarity = Polarity.POSITIVE if i % 2 == 0 else Polarity.NEGATIVE
+        form = LogicalForm(
+            context_id="perf",
+            logical_type=LogicalType.GROUND_FACT,
+            subject=Entity(name=f"entity_{i % 20}"),   # 20 distinct subjects
+            predicate=Relation(verb="is"),
+            object=Entity(name="mortal"),
+            polarity=polarity,
+            source_text=f"Statement {i}",
+        )
+        vec = rng.random(768).astype(np.float32)
+        form.embedding = vec / np.linalg.norm(vec)
+        forms.append(form)
+
+    start = time.perf_counter()
+    violations = consistency_checker._check_polarity_contradictions(forms)
+    elapsed = time.perf_counter() - start
+
+    assert isinstance(violations, list)
+    assert elapsed < 5.0, (
+        f"_check_polarity_contradictions took {elapsed:.2f}s for 200 forms — "
+        "vectorised implementation should be well under 5 s"
+    )

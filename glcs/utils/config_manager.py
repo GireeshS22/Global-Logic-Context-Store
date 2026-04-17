@@ -98,16 +98,12 @@ def load_config(config_path: str) -> Dict[str, Any]:
         )
 
     # Validate configuration
-    if not validate_config(config):
-        raise ConfigurationError(
-            f"Configuration validation failed for: {config_path}\n"
-            f"Please check that all required sections are present."
-        )
+    validate_config(config)  # raises ConfigurationError on failure
 
     return config
 
 
-def validate_config(config: Dict[str, Any]) -> bool:
+def validate_config(config: Dict[str, Any]) -> None:
     """
     Validate configuration structure and values.
 
@@ -120,16 +116,9 @@ def validate_config(config: Dict[str, Any]) -> bool:
     Args:
         config: Configuration dictionary to validate
 
-    Returns:
-        True if configuration is valid
-
     Raises:
-        ConfigurationError: If validation fails
-
-    Example:
-        >>> config = {"memory": {...}, "consistency": {...}}
-        >>> validate_config(config)
-        True
+        ConfigurationError: If validation fails (never returns False — always
+        raises on invalid config so callers do not need to check the return value).
     """
     from glcs.utils.exceptions import ConfigurationError
 
@@ -177,7 +166,7 @@ def validate_config(config: Dict[str, Any]) -> bool:
                 UserWarning
             )
 
-    return True
+    return None
 
 
 def get_config_value(

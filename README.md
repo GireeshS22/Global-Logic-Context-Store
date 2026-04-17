@@ -12,8 +12,8 @@ GLCS (Global Logical Context Store) is a neuro-symbolic middleware system design
 
 ### 🎯 Stage 1.5 (Current) - Advanced LLM Parser
 - **LLM-Based Parsing**: Understands complex natural language using GPT-4, Claude, Gemini, or local Ollama
-- **768-Dimensional Embeddings**: Semantic similarity search using sentence transformers
-- **Vector Memory**: ChromaDB-powered storage with efficient similarity search
+- **Configurable Embeddings**: Semantic similarity search using sentence transformers — encoder model and dimension are configurable
+- **Vector Memory**: ChromaDB-powered storage with efficient similarity search and lossless round-trip (entity IDs, relation types, and metadata fully preserved)
 - **Advanced Consistency Checking**: Detects contradictions using semantic similarity
 - **Multi-Provider Support**: Works with 5 LLM providers (Ollama, OpenAI, Anthropic, Gemini, Groq)
 - **Offline Mode**: 100% free local operation with Ollama
@@ -179,15 +179,20 @@ Global-Logic-Context-Store/
 ### Running Tests
 
 ```bash
-# Run all tests
-poetry run pytest
+# Run all unit tests (234 tests)
+poetry run pytest tests/unit/ -q
 
 # Run with coverage
-poetry run pytest --cov=glcs
+poetry run pytest tests/unit/ --cov=glcs --cov-report=term-missing
 
-# Run specific test file
+# Run a specific file
 poetry run pytest tests/unit/test_models.py
+
+# Stop on first failure
+poetry run pytest tests/unit/ -x
 ```
+
+See [tests/README.md](tests/README.md) for the full testing guide — per-file descriptions, example test code, TDD guidelines, and stage status.
 
 ### Code Formatting
 
@@ -209,7 +214,8 @@ poetry run ruff check glcs/ tests/
 - [Utils Documentation](glcs/utils/README.md) - Configuration, logging, exceptions
 
 ### General
-- [Testing Guide](tests/README.md) - How to run and write tests
+- [Testing Guide](tests/README.md) - Full test suite guide (234 tests, per-file descriptions, TDD guidelines)
+- [Build Principles](docs/BUILD_PRINCIPLES.md) - Engineering standards all contributors must follow
 - [Configuration Guide](config/README.md) - YAML configuration reference
 
 ## Research

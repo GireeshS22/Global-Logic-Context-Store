@@ -4,14 +4,25 @@ Ollama provider implementation for GLCS.
 Supports local LLM inference with Ollama (100% private, no API key needed).
 """
 
-from typing import List, Dict, Any, Optional
+import logging
+from typing import List, Dict, Any
 from glcs.providers.base import (
     LLMProvider,
     ProviderConfig,
     ProviderError,
+    ProviderConfigError,
     ProviderAPIError,
     ProviderTimeoutError,
 )
+
+logger = logging.getLogger(__name__)
+
+# Import typed SDK exceptions for proper error classification (#24)
+try:
+    import ollama as _ollama_sdk
+    _OLLAMA_RESPONSE_ERROR = _ollama_sdk.ResponseError
+except (ImportError, AttributeError):
+    _OLLAMA_RESPONSE_ERROR = None
 
 
 class OllamaProvider(LLMProvider):
@@ -29,21 +40,26 @@ class OllamaProvider(LLMProvider):
     """
 
     def __init__(self, config: ProviderConfig):
-        """Initialize Ollama provider
-
-        Args:
-            config: Provider configuration
-        """
         super().__init__(config)
 
-        # Set default model if not provided
         if not self.config.model:
             self.config.model = "llama3.2"
 
-        # Get endpoint from config or use default
-        self.endpoint = config.extra.get('endpoint', 'http://localhost:11434') if config.extra else 'http://localhost:11434'
+        self.endpoint = (
+            config.extra.get('endpoint', 'http://localhost:11434')
+            if config.extra else 'http://localhost:11434'
+        )
+        # Auto-pull is opt-in — silently downloading multi-GB models in __init__ is
+        # dangerous in CI/CD (#26)
+        self.auto_pull = (
+            config.extra.get('auto_pull', False)
+            if config.extra else False
+        )
 
-        # Initialize Ollama client
+        # Validate model name before connecting (#27)
+        if not self.config.model:
+            raise ProviderConfigError("Ollama model name is required")
+
         try:
             import ollama
             self._client = ollama.Client(host=self.endpoint)
@@ -54,150 +70,112 @@ class OllamaProvider(LLMProvider):
                 "Install with: pip install ollama"
             )
 
-        # Check if Ollama is running and model is available
         self._check_availability()
 
     def _check_availability(self) -> None:
-        """Check if Ollama is running and model is available
+        """Check if Ollama is running and model is available.
 
-        Raises:
-            ProviderError: If Ollama is not available
+        Raises ProviderError if Ollama is unreachable or the model is missing
+        and auto_pull is False.
         """
         try:
-            # Try to list models to check if Ollama is running
             models = self._client.list()
-
-            # Check if our model is available
-            # Get full model names (with version tags like :0.5b)
-            # Handle both dict and object formats for compatibility
-            model_list = models.get('models', []) if isinstance(models, dict) else getattr(models, 'models', [])
+            model_list = (
+                models.get('models', []) if isinstance(models, dict)
+                else getattr(models, 'models', [])
+            )
 
             available_models = []
             for m in model_list:
-                # Support both dict access (old API) and attribute access (new API)
-                name = m.get('name') if isinstance(m, dict) else getattr(m, 'model', getattr(m, 'name', None))
+                name = (
+                    m.get('name') if isinstance(m, dict)
+                    else getattr(m, 'model', getattr(m, 'name', None))
+                )
                 if name:
                     available_models.append(name)
 
-            # Also create list of base names (without version) for fallback checking
             available_base_models = [name.split(':')[0] for name in available_models]
-
-            # Check both full name and base name
             model_available = (
-                self.config.model in available_models or
-                self.config.model.split(':')[0] in available_base_models
+                self.config.model in available_models
+                or self.config.model.split(':')[0] in available_base_models
             )
 
             if not model_available:
-                # Model not available - try to pull it
-                print(f"Model '{self.config.model}' not found locally. Attempting to pull...")
-                try:
-                    self._client.pull(self.config.model)
-                    print(f"Successfully pulled model '{self.config.model}'")
-                except Exception as pull_error:
+                if self.auto_pull:
+                    logger.info(
+                        "Model '%s' not found locally. Pulling from registry...",
+                        self.config.model
+                    )
+                    try:
+                        self._client.pull(self.config.model)
+                        logger.info("Successfully pulled model '%s'", self.config.model)
+                    except Exception as pull_error:
+                        raise ProviderError(
+                            f"Model '{self.config.model}' not available and could not be pulled. "
+                            f"Error: {pull_error}\n"
+                            f"Available models: {', '.join(available_models)}\n"
+                            f"Pull manually with: ollama pull {self.config.model}"
+                        )
+                else:
                     raise ProviderError(
-                        f"Model '{self.config.model}' not available and could not be pulled. "
-                        f"Error: {pull_error}\n"
-                        f"Available models: {', '.join(available_models)}\n"
-                        f"Pull manually with: ollama pull {self.config.model}"
+                        f"Model '{self.config.model}' is not available locally.\n"
+                        f"Available models: {', '.join(available_models) or 'none'}\n"
+                        f"Pull it with: ollama pull {self.config.model}\n"
+                        f"Or set auto_pull=True in extra config to allow automatic downloads."
                     )
 
+        except ProviderError:
+            raise
         except Exception as e:
             if 'connection' in str(e).lower() or 'refused' in str(e).lower():
                 raise ProviderError(
                     f"Cannot connect to Ollama at {self.endpoint}. "
-                    "Make sure Ollama is running. "
-                    "Start with: ollama serve"
+                    "Make sure Ollama is running: ollama serve"
                 )
-            # Re-raise if it's already a ProviderError
-            if isinstance(e, ProviderError):
-                raise
-            # Otherwise wrap it
             raise ProviderError(f"Error checking Ollama availability: {e}")
 
-    def generate(self,
-                 messages: List[Dict[str, str]],
-                 **kwargs) -> str:
-        """Generate response using Ollama
-
-        Args:
-            messages: List of messages in OpenAI format
-            **kwargs: Additional parameters
-
-        Returns:
-            Generated text response
-
-        Raises:
-            ProviderAPIError: If generation fails
-            ProviderTimeoutError: If request times out
-        """
+    def generate(self, messages: List[Dict[str, str]], **kwargs) -> str:
         try:
-            # Ollama uses similar message format to OpenAI
             params = {
                 'model': kwargs.get('model', self.config.model),
                 'messages': messages,
             }
-
-            # Add generation options
             options = {
                 'temperature': kwargs.get('temperature', self.config.temperature),
                 'num_predict': kwargs.get('max_tokens', self.config.max_tokens),
             }
-
-            # Add any extra options
             if 'top_p' in kwargs:
                 options['top_p'] = kwargs['top_p']
             if 'top_k' in kwargs:
                 options['top_k'] = kwargs['top_k']
-
             params['options'] = options
 
-            # Make API call
             response = self._client.chat(**params)
-
-            # Extract and return content
             return response['message']['content']
 
+        except ProviderError:
+            raise
         except Exception as e:
+            # Typed SDK exception (#24)
+            if _OLLAMA_RESPONSE_ERROR and isinstance(e, _OLLAMA_RESPONSE_ERROR):
+                raise ProviderAPIError(f"Ollama API error (status {e.status_code}): {e}")
+            # Fallback string matching
             error_msg = str(e).lower()
-
-            # Check for specific error types
             if 'timeout' in error_msg:
                 raise ProviderTimeoutError(f"Ollama request timed out: {e}")
-            elif 'connection' in error_msg or 'refused' in error_msg:
+            if 'connection' in error_msg or 'refused' in error_msg:
                 raise ProviderAPIError(
                     f"Cannot connect to Ollama. Is it running? Error: {e}"
                 )
-            else:
-                raise ProviderAPIError(f"Ollama error: {e}")
+            raise ProviderAPIError(f"Ollama error: {e}")
 
     def validate_config(self) -> bool:
-        """Validate Ollama configuration
-
-        Returns:
-            True if configuration is valid
-        """
-        # No API key needed for Ollama
-        # Just check model
-        if not self.config.model:
-            return False
-
-        return True
+        return bool(self.config.model)
 
     def get_provider_name(self) -> str:
-        """Get provider name
-
-        Returns:
-            Provider name 'ollama'
-        """
         return "ollama"
 
     def get_model_info(self) -> Dict[str, Any]:
-        """Get model information
-
-        Returns:
-            Dictionary with model information
-        """
         info = super().get_model_info()
         info['local'] = True
         info['requires_api_key'] = False
@@ -205,38 +183,34 @@ class OllamaProvider(LLMProvider):
         info['privacy'] = '100% local - no data leaves your machine'
 
         try:
-            # Get model details from Ollama
             model_info = self._client.show(self.config.model)
             info['model_details'] = model_info
-        except:
+        except Exception:  # #30: bare except → except Exception
             pass
 
         return info
 
     def list_local_models(self) -> List[str]:
-        """List locally available models
-
-        Returns:
-            List of model names
-        """
         try:
             models = self._client.list()
-            # Handle both dict and object formats for compatibility
-            model_list = models.get('models', []) if isinstance(models, dict) else getattr(models, 'models', [])
-
+            model_list = (
+                models.get('models', []) if isinstance(models, dict)
+                else getattr(models, 'models', [])
+            )
             available_models = []
             for m in model_list:
-                # Support both dict access (old API) and attribute access (new API)
-                name = m.get('name') if isinstance(m, dict) else getattr(m, 'model', getattr(m, 'name', None))
+                name = (
+                    m.get('name') if isinstance(m, dict)
+                    else getattr(m, 'model', getattr(m, 'name', None))
+                )
                 if name:
                     available_models.append(name)
-
             return available_models
         except Exception as e:
             raise ProviderAPIError(f"Error listing Ollama models: {e}")
 
     def pull_model(self, model_name: str) -> None:
-        """Pull a model from Ollama registry
+        """Pull a model from the Ollama registry.
 
         Args:
             model_name: Name of model to pull
@@ -245,8 +219,8 @@ class OllamaProvider(LLMProvider):
             ProviderAPIError: If pull fails
         """
         try:
-            print(f"Pulling model '{model_name}'...")
+            logger.info("Pulling model '%s'...", model_name)  # #29: print → logger
             self._client.pull(model_name)
-            print(f"Successfully pulled model '{model_name}'")
+            logger.info("Successfully pulled model '%s'", model_name)  # #29
         except Exception as e:
             raise ProviderAPIError(f"Error pulling model '{model_name}': {e}")

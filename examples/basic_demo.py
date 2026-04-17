@@ -8,7 +8,7 @@ This script demonstrates the core GLCS features:
 - Querying stored knowledge
 """
 
-from glcs import SimpleParser, SimpleMemory, ConsistencyChecker
+from glcs import SimpleParser, SimpleMemory, SimpleConsistencyChecker
 from glcs.core import LogicalType
 
 
@@ -28,7 +28,7 @@ def main():
     # Initialize components
     parser = SimpleParser()
     memory = SimpleMemory(persist_path="demo_memory.json")
-    checker = ConsistencyChecker(memory)
+    checker = SimpleConsistencyChecker(memory)
 
     print("✓ Parser initialized")
     print("✓ Memory initialized")

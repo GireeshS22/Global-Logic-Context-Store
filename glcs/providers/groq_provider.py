@@ -4,18 +4,30 @@ Groq provider implementation for GLCS.
 Supports fast inference with Mixtral, Llama, and other models.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from glcs.providers.base import (
-    LLMProvider,
+    OpenAICompatibleProvider,
     ProviderConfig,
     ProviderError,
+    ProviderConfigError,
     ProviderAPIError,
     ProviderTimeoutError,
     ProviderRateLimitError,
 )
 
+# Import typed SDK exceptions for proper error classification (#24)
+try:
+    import groq as _groq_sdk
+    _GROQ_TIMEOUT_ERROR = _groq_sdk.APITimeoutError
+    _GROQ_RATE_LIMIT_ERROR = _groq_sdk.RateLimitError
+    _GROQ_API_ERROR = _groq_sdk.APIError
+except (ImportError, AttributeError):
+    _GROQ_TIMEOUT_ERROR = None
+    _GROQ_RATE_LIMIT_ERROR = None
+    _GROQ_API_ERROR = None
 
-class GroqProvider(LLMProvider):
+
+class GroqProvider(OpenAICompatibleProvider):
     """Groq LLM provider
 
     Groq provides ultra-fast inference for open-source models:
@@ -26,18 +38,17 @@ class GroqProvider(LLMProvider):
     """
 
     def __init__(self, config: ProviderConfig):
-        """Initialize Groq provider
-
-        Args:
-            config: Provider configuration
-        """
         super().__init__(config)
 
-        # Set default model if not provided
         if not self.config.model:
             self.config.model = "mixtral-8x7b-32768"
 
-        # Initialize Groq client
+        # Validate config before creating client (#27)
+        if not self.config.api_key:
+            raise ProviderConfigError(
+                "Groq API key is required. Set GROQ_API_KEY or pass api_key."
+            )
+
         try:
             from groq import Groq
             self._client = Groq(
@@ -50,84 +61,21 @@ class GroqProvider(LLMProvider):
                 "Install with: pip install groq"
             )
 
-    def generate(self,
-                 messages: List[Dict[str, str]],
-                 **kwargs) -> str:
-        """Generate response using Groq API
-
-        Args:
-            messages: List of messages in OpenAI format
-            **kwargs: Additional parameters
-
-        Returns:
-            Generated text response
-
-        Raises:
-            ProviderAPIError: If API call fails
-            ProviderTimeoutError: If request times out
-            ProviderRateLimitError: If rate limit is exceeded
-        """
-        try:
-            # Groq uses OpenAI-compatible API
-            params = {
-                'model': kwargs.get('model', self.config.model),
-                'messages': messages,
-                'temperature': kwargs.get('temperature', self.config.temperature),
-                'max_tokens': kwargs.get('max_tokens', self.config.max_tokens),
-            }
-
-            # Add any extra parameters
-            for key, value in kwargs.items():
-                if key not in params:
-                    params[key] = value
-
-            # Make API call
-            response = self._client.chat.completions.create(**params)
-
-            # Extract and return content
-            return response.choices[0].message.content
-
-        except Exception as e:
-            error_msg = str(e).lower()
-
-            # Check for specific error types
-            if 'timeout' in error_msg:
-                raise ProviderTimeoutError(f"Groq request timed out: {e}")
-            elif 'rate limit' in error_msg or 'quota' in error_msg or '429' in error_msg:
-                raise ProviderRateLimitError(f"Groq rate limit exceeded: {e}")
-            else:
-                raise ProviderAPIError(f"Groq API error: {e}")
-
-    def validate_config(self) -> bool:
-        """Validate Groq configuration
-
-        Returns:
-            True if configuration is valid
-        """
-        # Check API key
-        if not self.config.api_key:
-            return False
-
-        # Check model
-        if not self.config.model:
-            return False
-
-        return True
+    def _classify_error(self, e: Exception) -> ProviderError:
+        """Use typed groq SDK exceptions where available (#24)."""
+        if _GROQ_TIMEOUT_ERROR and isinstance(e, _GROQ_TIMEOUT_ERROR):
+            return ProviderTimeoutError(f"Groq request timed out: {e}")
+        if _GROQ_RATE_LIMIT_ERROR and isinstance(e, _GROQ_RATE_LIMIT_ERROR):
+            return ProviderRateLimitError(f"Groq rate limit exceeded: {e}")
+        if _GROQ_API_ERROR and isinstance(e, _GROQ_API_ERROR):
+            return ProviderAPIError(f"Groq API error: {e}")
+        # Fallback to string matching
+        return super()._classify_error(e)
 
     def get_provider_name(self) -> str:
-        """Get provider name
-
-        Returns:
-            Provider name 'groq'
-        """
         return "groq"
 
     def get_model_info(self) -> Dict[str, Any]:
-        """Get model information
-
-        Returns:
-            Dictionary with model information
-        """
         info = super().get_model_info()
         info['supports_streaming'] = True
         info['ultra_fast'] = True
@@ -135,11 +83,6 @@ class GroqProvider(LLMProvider):
         return info
 
     def _get_context_window(self) -> int:
-        """Get context window size for current model
-
-        Returns:
-            Context window size in tokens
-        """
         context_windows = {
             'mixtral-8x7b-32768': 32768,
             'llama-3.1-70b-versatile': 131072,
@@ -148,5 +91,4 @@ class GroqProvider(LLMProvider):
             'llama3-70b-8192': 8192,
             'llama3-8b-8192': 8192,
         }
-
         return context_windows.get(self.config.model, 8192)

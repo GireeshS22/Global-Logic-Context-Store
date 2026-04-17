@@ -11,6 +11,7 @@ GLCS is designed to be released as a production-grade PyPI package. Every line o
 - **Sound architecture.** All designs must be scalable, modular, and compatible with the broader Python ecosystem. Think long-term — write code that future contributors can extend without rewriting.
 - **World-class standards.** Follow established Python conventions (PEP 8, type hints, clear naming). The bar is not "it works" — it is "it works well, reads well, and scales well."
 - **Verifiable correctness.** Every new component must ship with proper tests. No pull request is complete without test coverage that demonstrates the code works as intended and does not break existing functionality.
+- **Test-driven development.** All new features must follow TDD: write failing tests that define the expected behaviour first, then write the minimum code to make them pass, then refactor. Good test coverage is not an afterthought — it is a prerequisite for merging. Tests must cover the happy path, edge cases, and failure modes.
 
 ## 2. Clarity and Auditability
 

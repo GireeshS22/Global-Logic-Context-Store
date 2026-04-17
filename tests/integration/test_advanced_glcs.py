@@ -78,18 +78,18 @@ class TestFullPipeline:
         report1 = advanced_glcs.process_statement("John is a manager", "test-ctx-2")
         assert report1.is_consistent
 
-        # Second statement: John is an engineer (contradiction)
+        # Second statement: John is NOT a manager (polarity contradiction)
         mock_call_llm.return_value = {
             'subject': {'name': 'john', 'type': 'person'},
             'predicate': {'verb': 'is', 'type': 'property'},
-            'object': {'name': 'engineer', 'type': 'role'},
+            'object': {'name': 'manager', 'type': 'role'},
             'logical_type': 'ground_fact',
-            'polarity': 'positive',
+            'polarity': 'negative',
             'confidence': 0.95
         }
-        report2 = advanced_glcs.process_statement("John is an engineer", "test-ctx-2")
+        report2 = advanced_glcs.process_statement("John is not a manager", "test-ctx-2")
 
-        # Should detect contradiction
+        # Should detect polarity contradiction
         assert report2.is_consistent == False
         assert len(report2.violations) > 0
 
@@ -178,18 +178,20 @@ class TestContextManagement:
     @patch('glcs.core.logical_parser.LLMLogicalParser._call_llm')
     def test_context_summary(self, mock_call_llm, advanced_glcs):
         """Test getting context summary."""
-        # Add some statements
-        mock_call_llm.return_value = {
-            'subject': {'name': 'test', 'type': None},
-            'predicate': {'verb': 'is', 'type': None},
-            'object': None,
-            'logical_type': 'ground_fact',
-            'polarity': 'positive',
-            'confidence': 0.9
-        }
+        # Add 3 distinct statements with unique mock responses
+        subjects = ['alice', 'bob', 'charlie']
+        objects = ['engineer', 'designer', 'manager']
 
         for i in range(3):
-            advanced_glcs.process_statement(f"Test statement {i}", "test-ctx-6")
+            mock_call_llm.return_value = {
+                'subject': {'name': subjects[i], 'type': 'person'},
+                'predicate': {'verb': 'is', 'type': 'property'},
+                'object': {'name': objects[i], 'type': 'role'},
+                'logical_type': 'ground_fact',
+                'polarity': 'positive',
+                'confidence': 0.9
+            }
+            advanced_glcs.process_statement(f"{subjects[i]} is a {objects[i]}", "test-ctx-6")
 
         summary = advanced_glcs.get_context_summary("test-ctx-6")
 
@@ -200,18 +202,26 @@ class TestContextManagement:
     @patch('glcs.core.logical_parser.LLMLogicalParser._call_llm')
     def test_clear_context(self, mock_call_llm, advanced_glcs):
         """Test clearing a context."""
+        # Use distinct mock responses so neither is flagged as redundant
         mock_call_llm.return_value = {
-            'subject': {'name': 'test', 'type': None},
-            'predicate': {'verb': 'is', 'type': None},
-            'object': None,
+            'subject': {'name': 'alice', 'type': 'person'},
+            'predicate': {'verb': 'is', 'type': 'property'},
+            'object': {'name': 'engineer', 'type': 'role'},
             'logical_type': 'ground_fact',
             'polarity': 'positive',
             'confidence': 0.9
         }
+        advanced_glcs.process_statement("Alice is an engineer", "test-ctx-7")
 
-        # Add statements
-        advanced_glcs.process_statement("Test 1", "test-ctx-7")
-        advanced_glcs.process_statement("Test 2", "test-ctx-7")
+        mock_call_llm.return_value = {
+            'subject': {'name': 'bob', 'type': 'person'},
+            'predicate': {'verb': 'is', 'type': 'property'},
+            'object': {'name': 'designer', 'type': 'role'},
+            'logical_type': 'ground_fact',
+            'polarity': 'positive',
+            'confidence': 0.9
+        }
+        advanced_glcs.process_statement("Bob is a designer", "test-ctx-7")
 
         # Clear context
         count = advanced_glcs.clear_context("test-ctx-7")

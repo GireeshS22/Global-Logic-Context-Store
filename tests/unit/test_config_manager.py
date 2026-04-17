@@ -40,7 +40,7 @@ def test_load_config_success():
 
     # Check specific values
     assert config['memory']['vector_dimension'] == 768
-    assert config['encoder']['model_name'] == "sentence-transformers/all-MiniLM-L6-v2"
+    assert config['encoder']['model_name'] == "all-mpnet-base-v2"
 
 
 def test_load_config_file_not_found():
@@ -94,8 +94,8 @@ def test_validate_config_valid():
         }
     }
 
-    # Should not raise
-    assert validate_config(valid_config) is True
+    # Should not raise — returns None on success
+    assert validate_config(valid_config) is None
 
 
 def test_validate_config_missing_section():

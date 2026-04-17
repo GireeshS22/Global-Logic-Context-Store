@@ -7,7 +7,7 @@ import tempfile
 import os
 from glcs.parser import SimpleParser
 from glcs.memory import SimpleMemory
-from glcs.checker import ConsistencyChecker
+from glcs.checker import SimpleConsistencyChecker
 from glcs.simple_models import LogicalType, LogicalStatement
 
 
@@ -21,7 +21,7 @@ class TestIntegration:
 
         self.parser = SimpleParser()
         self.memory = SimpleMemory(persist_path=self.temp_file.name)
-        self.checker = ConsistencyChecker(self.memory)
+        self.checker = SimpleConsistencyChecker(self.memory)
 
     def teardown_method(self):
         """Clean up test fixtures"""
@@ -103,7 +103,7 @@ class TestIntegration:
 
         # Simulate new session
         new_memory = SimpleMemory(persist_path=self.temp_file.name)
-        new_checker = ConsistencyChecker(new_memory)
+        new_checker = SimpleConsistencyChecker(new_memory)
 
         # Check that previous fact is still there
         stats = new_memory.get_stats()

@@ -20,7 +20,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from datetime import datetime
+from datetime import datetime, timezone
 
 from glcs.api.routes import router, initialize_glcs
 from glcs.api.models import ErrorResponse
@@ -140,11 +140,15 @@ app = FastAPI(
 # Middleware
 # ============================================================================
 
-# CORS middleware - Allow all origins in development
+# CORS middleware
+# allow_origins=["*"] is incompatible with allow_credentials=True per the CORS spec.
+# Credentials (cookies, Authorization headers) require explicit origin allowlisting.
+_cors_origins = os.getenv("GLCS_CORS_ORIGINS", "").split(",")
+_allow_origins = [o.strip() for o in _cors_origins if o.strip()] or ["*"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify allowed origins
-    allow_credentials=True,
+    allow_origins=_allow_origins,
+    allow_credentials=_allow_origins != ["*"],  # only True when origins are explicit
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -154,7 +158,7 @@ app.add_middleware(
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     """Log all incoming requests."""
-    start_time = datetime.utcnow()
+    start_time = datetime.now(timezone.utc)
 
     # Log request
     logger.info(f"{request.method} {request.url.path}")
@@ -163,7 +167,7 @@ async def log_requests(request: Request, call_next):
     response = await call_next(request)
 
     # Log response
-    duration = (datetime.utcnow() - start_time).total_seconds()
+    duration = (datetime.now(timezone.utc) - start_time).total_seconds()
     logger.info(f"{request.method} {request.url.path} - {response.status_code} ({duration:.3f}s)")
 
     return response
@@ -182,12 +186,12 @@ async def global_exception_handler(request: Request, exc: Exception):
         error="InternalServerError",
         message="An unexpected error occurred",
         details={"error_type": type(exc).__name__},
-        timestamp=datetime.utcnow()
+        timestamp=datetime.now(timezone.utc)
     )
 
     return JSONResponse(
         status_code=500,
-        content=error_response.model_dump()
+        content=error_response.model_dump(mode="json")  # (#16: mode=json converts datetime to ISO string)
     )
 
 

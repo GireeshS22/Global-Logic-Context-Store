@@ -82,7 +82,7 @@ def demo_contradiction_detection():
     # Try to add contradictory fact
     print("\n⚠️  Attempting to add contradictory fact:")
     print("   • Bob is a designer (contradicts 'Bob is a developer')")
-    report = glcs.process_statement("Bob is a designer", "team-db")
+    report = glcs.process_statement("Bob is not a developer", "team-db")
     print_report(report)
 
 

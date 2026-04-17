@@ -4,7 +4,7 @@ GLCS Interactive Test Script
 Shows realistic use cases that work well
 """
 
-from glcs import SimpleParser, SimpleMemory, ConsistencyChecker
+from glcs import SimpleParser, SimpleMemory, SimpleConsistencyChecker
 
 def print_header(text):
     print("\n" + "=" * 60)
@@ -41,7 +41,7 @@ def test_statement(parser, checker, memory, text, description=""):
 def main():
     parser = SimpleParser()
     memory = SimpleMemory(persist_path=None)
-    checker = ConsistencyChecker(memory)
+    checker = SimpleConsistencyChecker(memory)
 
     print_header("GLCS Test Suite - What Works Well")
 

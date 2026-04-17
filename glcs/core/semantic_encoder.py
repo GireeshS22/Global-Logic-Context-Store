@@ -77,6 +77,7 @@ class SemanticEncoder:
         """
         self.model_name = model_name
         self.model = self._load_model()
+        self.embedding_dim = self.model.get_sentence_embedding_dimension()
 
     def _load_model(self) -> SentenceTransformer:
         """
@@ -139,10 +140,10 @@ class SemanticEncoder:
         # Ensure output is numpy array with correct shape
         embedding = np.array(embedding, dtype=np.float32)
 
-        if embedding.shape != (768,):
+        if embedding.shape != (self.embedding_dim,):
             raise RuntimeError(
                 f"Model {self.model_name} produced {embedding.shape} dimensions, "
-                f"expected (768,). Model may have changed."
+                f"expected ({self.embedding_dim},). Model may have changed."
             )
 
         return embedding
@@ -206,9 +207,9 @@ class SemanticEncoder:
 
         # Validate dimensions
         for i, emb in enumerate(embeddings):
-            if emb.shape != (768,):
+            if emb.shape != (self.embedding_dim,):
                 raise RuntimeError(
-                    f"Embedding at index {i} has shape {emb.shape}, expected (768,)"
+                    f"Embedding at index {i} has shape {emb.shape}, expected ({self.embedding_dim},)"
                 )
 
         return embeddings

@@ -31,7 +31,7 @@ env.bak/
 venv.bak/
 
 # Poetry
-poetry.lock
+# poetry.lock is intentionally tracked for reproducible installs
 
 # Testing
 .pytest_cache/
@@ -78,3 +78,14 @@ dmypy.json
 
 # Ruff
 .ruff_cache/
+# ChromaDB vector store
+chroma_db/
+
+# Root-level generated JSON memory files
+/*.json
+
+# JSONL data files
+data/*.jsonl
+
+# Streamlit cache
+.streamlit/

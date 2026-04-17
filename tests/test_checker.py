@@ -1,17 +1,17 @@
 """
-Tests for the ConsistencyChecker component
+Tests for the SimpleConsistencyChecker component
 """
 
 import pytest
 import tempfile
 import os
-from glcs.checker import ConsistencyChecker
+from glcs.checker import SimpleConsistencyChecker
 from glcs.memory import SimpleMemory
 from glcs.simple_models import LogicalStatement, LogicalType
 
 
-class TestConsistencyChecker:
-    """Test cases for the ConsistencyChecker class"""
+class TestSimpleConsistencyChecker:
+    """Test cases for the SimpleConsistencyChecker class"""
 
     def setup_method(self):
         """Set up test fixtures"""
@@ -19,7 +19,7 @@ class TestConsistencyChecker:
         self.temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.json')
         self.temp_file.close()
         self.memory = SimpleMemory(persist_path=self.temp_file.name)
-        self.checker = ConsistencyChecker(self.memory)
+        self.checker = SimpleConsistencyChecker(self.memory)
 
     def teardown_method(self):
         """Clean up test fixtures"""

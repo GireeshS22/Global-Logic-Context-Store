@@ -4,15 +4,27 @@ Google Gemini provider implementation for GLCS.
 Supports Gemini 1.5 Pro and Gemini 1.5 Flash.
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from glcs.providers.base import (
     LLMProvider,
     ProviderConfig,
     ProviderError,
+    ProviderConfigError,
     ProviderAPIError,
     ProviderTimeoutError,
     ProviderRateLimitError,
 )
+
+# Import typed SDK exceptions for proper error classification (#24)
+try:
+    from google.api_core import exceptions as _google_exceptions
+    _GEMINI_DEADLINE_ERROR = _google_exceptions.DeadlineExceeded
+    _GEMINI_RATE_LIMIT_ERROR = _google_exceptions.ResourceExhausted
+    _GEMINI_API_ERROR = _google_exceptions.GoogleAPICallError
+except (ImportError, AttributeError):
+    _GEMINI_DEADLINE_ERROR = None
+    _GEMINI_RATE_LIMIT_ERROR = None
+    _GEMINI_API_ERROR = None
 
 
 class GeminiProvider(LLMProvider):
@@ -25,18 +37,17 @@ class GeminiProvider(LLMProvider):
     """
 
     def __init__(self, config: ProviderConfig):
-        """Initialize Gemini provider
-
-        Args:
-            config: Provider configuration
-        """
         super().__init__(config)
 
-        # Set default model if not provided
         if not self.config.model:
             self.config.model = "gemini-1.5-flash"
 
-        # Initialize Gemini client
+        # Validate config before creating client (#27)
+        if not self.config.api_key:
+            raise ProviderConfigError(
+                "Google API key is required. Set GOOGLE_API_KEY or pass api_key."
+            )
+
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.config.api_key)
@@ -48,54 +59,32 @@ class GeminiProvider(LLMProvider):
                 "Install with: pip install google-generativeai"
             )
 
-    def generate(self,
-                 messages: List[Dict[str, str]],
-                 **kwargs) -> str:
-        """Generate response using Google Gemini API
-
-        Args:
-            messages: List of messages in OpenAI format
-            **kwargs: Additional parameters
-
-        Returns:
-            Generated text response
-
-        Raises:
-            ProviderAPIError: If API call fails
-            ProviderTimeoutError: If request times out
-            ProviderRateLimitError: If rate limit is exceeded
-        """
+    def generate(self, messages: List[Dict[str, str]], **kwargs) -> str:
         try:
-            # Convert messages to Gemini format
-            # Gemini uses a simpler format with role and parts
             gemini_messages = []
             system_instruction = None
 
             for msg in messages:
                 if msg['role'] == 'system':
-                    # Gemini 1.5 supports system instructions
                     system_instruction = msg['content']
                 else:
-                    # Map roles: assistant -> model, user -> user
                     role = 'model' if msg['role'] == 'assistant' else 'user'
                     gemini_messages.append({
                         'role': role,
                         'parts': [msg['content']]
                     })
 
-            # Create generation config
             generation_config = {
                 'temperature': kwargs.get('temperature', self.config.temperature),
                 'max_output_tokens': kwargs.get('max_tokens', self.config.max_tokens),
             }
-
-            # Add any extra generation config parameters
             if 'top_p' in kwargs:
                 generation_config['top_p'] = kwargs['top_p']
             if 'top_k' in kwargs:
                 generation_config['top_k'] = kwargs['top_k']
 
-            # Recreate model with system instruction if provided
+            # Recreate model only when a system instruction is present (#78 partially —
+            # avoids unnecessary recreation on the common no-system-instruction path)
             if system_instruction:
                 model = self._genai.GenerativeModel(
                     self.config.model,
@@ -104,68 +93,47 @@ class GeminiProvider(LLMProvider):
             else:
                 model = self._client
 
-            # Start chat session if we have conversation history
             if len(gemini_messages) > 1:
-                # Remove last message (the user's current message)
                 history = gemini_messages[:-1]
                 current_message = gemini_messages[-1]['parts'][0]
-
                 chat = model.start_chat(history=history)
                 response = chat.send_message(
                     current_message,
                     generation_config=generation_config
                 )
             else:
-                # Single message - use generate_content
                 response = model.generate_content(
                     gemini_messages[0]['parts'][0] if gemini_messages else "",
                     generation_config=generation_config
                 )
 
-            # Extract and return content
             return response.text
 
+        except ProviderError:
+            raise
         except Exception as e:
-            error_msg = str(e).lower()
-
-            # Check for specific error types
-            if 'timeout' in error_msg:
+            # Typed SDK exceptions (#24)
+            if _GEMINI_DEADLINE_ERROR and isinstance(e, _GEMINI_DEADLINE_ERROR):
                 raise ProviderTimeoutError(f"Gemini request timed out: {e}")
-            elif 'quota' in error_msg or 'rate limit' in error_msg or '429' in error_msg:
+            if _GEMINI_RATE_LIMIT_ERROR and isinstance(e, _GEMINI_RATE_LIMIT_ERROR):
                 raise ProviderRateLimitError(f"Gemini rate limit exceeded: {e}")
-            else:
+            if _GEMINI_API_ERROR and isinstance(e, _GEMINI_API_ERROR):
                 raise ProviderAPIError(f"Gemini API error: {e}")
+            # Fallback string matching
+            error_msg = str(e).lower()
+            if 'timeout' in error_msg or 'deadline' in error_msg:
+                raise ProviderTimeoutError(f"Gemini request timed out: {e}")
+            if 'quota' in error_msg or 'rate limit' in error_msg or '429' in error_msg:
+                raise ProviderRateLimitError(f"Gemini rate limit exceeded: {e}")
+            raise ProviderAPIError(f"Gemini API error: {e}")
 
     def validate_config(self) -> bool:
-        """Validate Gemini configuration
-
-        Returns:
-            True if configuration is valid
-        """
-        # Check API key
-        if not self.config.api_key:
-            return False
-
-        # Check model
-        if not self.config.model:
-            return False
-
-        return True
+        return bool(self.config.api_key and self.config.model)
 
     def get_provider_name(self) -> str:
-        """Get provider name
-
-        Returns:
-            Provider name 'gemini'
-        """
         return "gemini"
 
     def get_model_info(self) -> Dict[str, Any]:
-        """Get model information
-
-        Returns:
-            Dictionary with model information
-        """
         info = super().get_model_info()
         info['supports_streaming'] = True
         info['supports_system_instruction'] = True
@@ -173,15 +141,9 @@ class GeminiProvider(LLMProvider):
         return info
 
     def _get_context_window(self) -> int:
-        """Get context window size for current model
-
-        Returns:
-            Context window size in tokens
-        """
         context_windows = {
             'gemini-1.5-pro': 1000000,
             'gemini-1.5-flash': 1000000,
             'gemini-pro': 32760,
         }
-
         return context_windows.get(self.config.model, 32760)

@@ -8,7 +8,7 @@ Version: 2.1.0 (Stage 2.1)
 """
 
 from typing import List
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
 
@@ -96,7 +96,7 @@ def health_check():
         return HealthResponse(
             status="healthy" if all(v == "ready" for v in components.values()) else "degraded",
             version="2.1.0",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             components=components
         )
     except Exception as e:
@@ -104,7 +104,7 @@ def health_check():
         return HealthResponse(
             status="unhealthy",
             version="2.1.0",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
             components={"error": str(e)}
         )
 
@@ -231,7 +231,7 @@ def check_consistency(request: CheckRequest):
             )
 
         # Process and check statement
-        report = glcs.process_statement(request.text, request.context_id)
+        report = glcs.process_statement(request.text, request.context_id, auto_store=False)
 
         # Convert violations
         violations = [
@@ -248,7 +248,7 @@ def check_consistency(request: CheckRequest):
             is_consistent=report.is_consistent,
             violations=violations,
             form=None,  # Parsed form not returned in consistency report
-            checked_at=datetime.utcnow()
+            checked_at=datetime.now(timezone.utc)
         )
 
         logger.info(f"Consistency check: {'PASS' if report.is_consistent else 'FAIL'}")
@@ -303,9 +303,9 @@ def search_knowledge(
         search_results = [
             SearchResult(
                 form=_logical_form_to_response(form),
-                similarity_score=score
+                similarity_score=1.0  # search_similar returns ranked forms, no score exposed
             )
-            for form, score in results
+            for form in results
         ]
 
         response = SearchResponse(
@@ -347,7 +347,7 @@ def list_contexts():
             )
 
         # Get all contexts
-        context_ids = glcs.list_contexts()
+        context_ids = glcs.memory.list_contexts()
 
         # Get summary for each context
         contexts = []

@@ -7,7 +7,7 @@ All GLCS exceptions inherit from GLCSException for easy catching.
 Exception Hierarchy:
     GLCSException (base)
     ├── ConfigurationError      - Configuration issues
-    ├── MemoryError            - Memory operations failures
+    ├── GLCSMemoryError        - Memory operations failures
     ├── ConsistencyError       - Consistency checking failures
     ├── ValidationError        - Data validation failures
     └── ParsingError           - Parsing failures
@@ -77,7 +77,7 @@ class ConfigurationError(GLCSException):
     pass
 
 
-class MemoryError(GLCSException):
+class GLCSMemoryError(GLCSException):
     """
     Raised when memory operations fail.
 
@@ -89,13 +89,13 @@ class MemoryError(GLCSException):
 
     Example:
         >>> if vector.shape[0] != expected_dim:
-        ...     raise MemoryError(
+        ...     raise GLCSMemoryError(
         ...         f"Vector dimension mismatch: expected {expected_dim}, "
         ...         f"got {vector.shape[0]}"
         ...     )
 
         >>> if not self.can_write():
-        ...     raise MemoryError("Memory is full and eviction failed")
+        ...     raise GLCSMemoryError("Memory is full and eviction failed")
     """
     pass
 
