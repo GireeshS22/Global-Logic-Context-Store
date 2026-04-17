@@ -27,7 +27,7 @@ Usage:
 """
 
 from collections import defaultdict
-from typing import List, Optional, Tuple
+from typing import List, Optional
 from uuid import UUID
 
 import numpy as np

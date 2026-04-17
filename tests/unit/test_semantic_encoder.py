@@ -302,7 +302,7 @@ def test_add_embeddings_to_forms_empty_list(encoder):
 
 
 def test_logical_form_validates_embedding_dimension(encoder):
-    """Test that LogicalForm rejects wrong embedding dimensions."""
+    """LogicalForm accepts any 1D embedding — dimension is not hardcoded (#37)."""
     form = LogicalForm(
         context_id="test",
         logical_type=LogicalType.GROUND_FACT,
@@ -312,9 +312,13 @@ def test_logical_form_validates_embedding_dimension(encoder):
         source_text="Test"
     )
 
-    # Try to add wrong dimension embedding (should fail)
-    with pytest.raises(ValueError, match="must be 768-dimensional"):
-        form.embedding = np.random.rand(512)  # Wrong size
+    # Non-768 1D arrays are now valid — the encoder, not the model, enforces dimension
+    form.embedding = np.random.rand(512)
+    assert form.embedding.shape == (512,)
+
+    # Multi-dimensional arrays are still rejected
+    with pytest.raises(ValueError):
+        form.embedding = np.random.rand(768, 1)
 
 
 # ============================================================================

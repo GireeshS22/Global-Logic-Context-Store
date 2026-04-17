@@ -26,7 +26,6 @@ import hashlib
 from collections import OrderedDict
 from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timezone
-from uuid import uuid4
 
 from glcs.core.models import (
     LogicalForm,

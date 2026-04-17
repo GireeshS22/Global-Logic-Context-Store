@@ -127,21 +127,21 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 37 | Hardcoded 768-dim everywhere | `models.py:218`, `semantic_encoder.py:79,143,210`, `memory_manager.py:367` | Embedding dimension baked into validators. Cannot swap encoder model without touching code in 3 files. `self.embedding_dim` attribute exists on SemanticEncoder but is unused by the validation checks. |
-| 38 | `violation_type` is unvalidated string | `models.py:262` | No enum, any string passes. Compare to `LogicalType` and `Polarity` which are proper enums. |
-| 39 | `severity` validated by regex, not enum | `models.py:264` | Uses `pattern="^(HIGH\|MEDIUM\|LOW)$"` instead of a `Severity` enum. No IDE autocomplete, no type safety. |
-| 40 | `ConsistencyReport.is_consistent` requires manual sync | `models.py:303-316` | Caller must manually compute `is_consistent = (len(violations) == 0)` and pass it. Should be a computed field. |
-| 41 | Lossy storage round-trip | `memory_manager.py:647-695` | `store_form()` -> `retrieve_form()` loses `entity_type`, `relation_type`, `metadata`, all entity UUIDs. Reconstructed entities get new random IDs. |
-| 42 | Metadata duplication | `memory_manager.py:155-163, 254-263` | Identical metadata dict construction in `store_form` and `update_form`. DRY violation. |
+| 37 | ~~Hardcoded 768-dim everywhere~~ | ~~`models.py:218`, `semantic_encoder.py:79,143,210`, `memory_manager.py:367`~~ | **FIXED** Embedding validator now accepts any non-empty 1D array — dimension check removed from model. SemanticEncoder remains the authority on dimension. |
+| 38 | ~~`violation_type` is unvalidated string~~ | ~~`models.py:262`~~ | **FIXED** `ViolationType(str, Enum)` added with 4 values (`POLARITY_CONTRADICTION`, `UNIVERSAL_GROUND_CONTRADICTION`, `EXACT_REDUNDANCY`, `SEMANTIC_REDUNDANCY`). `Violation.violation_type` now typed. |
+| 39 | ~~`severity` validated by regex, not enum~~ | ~~`models.py:264`~~ | **FIXED** `Severity(str, Enum)` added (`HIGH`, `MEDIUM`, `LOW`). `Violation.severity` now typed. Full IDE autocomplete. |
+| 40 | ~~`ConsistencyReport.is_consistent` requires manual sync~~ | ~~`models.py:303-316`~~ | **FIXED** `is_consistent` is now a `@computed_field` — auto-derived from `len(violations) == 0`. Cannot be set manually. `ConsistencyChecker` updated to stop passing it. |
+| 41 | ~~Lossy storage round-trip~~ | ~~`memory_manager.py:647-695`~~ | **FIXED** `_build_metadata()` stores full `form_json` (Pydantic JSON, embedding excluded) in ChromaDB metadata. `_reconstruct_form()` deserialises from JSON — all entity IDs, relation IDs, relation_type, and metadata dicts fully preserved. |
+| 42 | ~~Metadata duplication~~ | ~~`memory_manager.py:155-163, 254-263`~~ | **FIXED** `_build_metadata(form)` helper extracted. `store_form` and `update_form` both call it — single source of truth. |
 
 ### 3.5 Dead Code & Unused Imports
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 43 | `augmented_prompt` is dead code | `llm_wrapper.py:246-250` | Context augmentation is built but never sent to the LLM. The entire memory-augmented generation feature is fake. The `_build_context` method has zero effect on actual LLM calls. |
-| 44 | `validate_config` never returns False | `glcs/utils/config_manager.py:110-180` | Return type is `bool` but only ever returns `True` or raises. The `if not validate_config()` check in caller is dead code. |
-| 45 | `_convert_messages` is dead code | `glcs/providers/base.py:91-103` | No provider overrides it, no code calls it. |
-| 46 | Unused imports | Various | `format_exception_message` (memory_manager.py:33), `Path` (memory_manager.py:24), `uuid4` (logical_parser.py:27), `Tuple` (consistency_checker.py:29), `Optional` (all provider files). |
+| 43 | ~~`augmented_prompt` is dead code~~ | ~~`llm_wrapper.py:246-250`~~ | **FIXED** `augmented_prompt` now actually sent to the LLM — history slice replaced with augmented version when context exists. History itself keeps the original prompt for clean multi-turn display. |
+| 44 | ~~`validate_config` never returns False~~ | ~~`glcs/utils/config_manager.py:110-180`~~ | **FIXED** Return type changed to `None`. Dead `if not validate_config()` branch removed from `load_config` — replaced with plain call. |
+| 45 | ~~`_convert_messages` is dead code~~ | ~~`glcs/providers/base.py:91-103`~~ | **FIXED** Method deleted — no provider ever overrode it and no code ever called it. |
+| 46 | ~~Unused imports~~ | ~~Various~~ | **FIXED** Removed: `format_exception_message` + `Path` (memory_manager.py), `uuid4` (logical_parser.py), `Tuple` (consistency_checker.py), `Optional` (all 5 provider files). |
 
 ### 3.6 API & Security
 
@@ -208,10 +208,10 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 17 | 46 |
-| **Total** | **83** | **37** | **46** |
+| Tier 3: Engineering Quality | 63 | 27 | 36 |
+| **Total** | **83** | **47** | **36** |
 
 ---
 
-**Last Updated:** 2026-03-26 (Tier 3 — #21–#36 fixed)
+**Last Updated:** 2026-04-17 (Tier 3 — #43–#46 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)

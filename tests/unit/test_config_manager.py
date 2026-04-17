@@ -94,8 +94,8 @@ def test_validate_config_valid():
         }
     }
 
-    # Should not raise
-    assert validate_config(valid_config) is True
+    # Should not raise — returns None on success
+    assert validate_config(valid_config) is None
 
 
 def test_validate_config_missing_section():

@@ -21,7 +21,6 @@ Usage:
     >>> retrieved = manager.retrieve_form(form_id)
 """
 
-from pathlib import Path
 from typing import Dict, List, Optional
 from uuid import UUID
 
@@ -30,7 +29,7 @@ from chromadb.config import Settings
 import numpy as np
 
 from glcs.core.models import LogicalForm
-from glcs.utils.exceptions import GLCSMemoryError, format_exception_message
+from glcs.utils.exceptions import GLCSMemoryError
 from glcs.utils.logger import get_logger
 
 logger = get_logger(__name__)

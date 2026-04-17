@@ -251,16 +251,21 @@ class GLCSWrapper:
         else:
             augmented_prompt = prompt
 
-        # Add to history
+        # Add original prompt to history — keep history readable for multi-turn display.
         self.history.append({"role": "user", "content": prompt})
 
-        # Prepare messages
+        # For the actual LLM call, swap the last user message with the augmented
+        # version when context is available so the model sees known facts.
+        history_slice = list(self.history[-10:])
+        if context:
+            history_slice[-1] = {"role": "user", "content": augmented_prompt}
+
         messages = [
             {
                 "role": "system",
                 "content": "You are a helpful assistant. Be logically consistent and respect established facts."
             },
-            *self.history[-10:],  # Include last 10 messages for context
+            *history_slice,
         ]
 
         # Generate response
