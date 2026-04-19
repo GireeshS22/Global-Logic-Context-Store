@@ -317,9 +317,9 @@ class TestProviderIntegration:
                 try:
                     provider = ProviderFactory.create(provider_name, config=config)
                     assert provider is not None
-                except (ProviderError, Exception):
+                except (ProviderError, ProviderConfigError, ImportError):
                     # Expected if dependencies not installed or service not running
                     pass
-            except Exception:
+            except (ProviderError, ProviderConfigError, ImportError):
                 # Skip providers that can't be created
                 pass

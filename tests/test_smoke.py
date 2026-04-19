@@ -47,7 +47,7 @@ def test_package_imports():
     import glcs.api
 
     # All imports succeeded
-    assert True
+    assert glcs is not None
 
 
 def test_dependencies_installed():

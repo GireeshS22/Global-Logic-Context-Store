@@ -12,11 +12,6 @@ from fastapi.testclient import TestClient
 from glcs.api.app import app
 from glcs.api.routes import initialize_glcs
 
-@pytest.fixture(autouse=True, scope="session")
-def setup_glcs():
-    """Initialize GLCS before running tests."""
-    initialize_glcs(in_memory=True)
-
 # Create test client
 client = TestClient(app)
 
