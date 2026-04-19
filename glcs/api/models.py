@@ -23,7 +23,7 @@ class ParseRequest(BaseModel):
     context_id: str = Field(..., description="Context identifier for the statement", min_length=1)
     use_cache: bool = Field(True, description="Whether to use cached results if available")
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "text": "John is a manager",
@@ -39,7 +39,7 @@ class CheckRequest(BaseModel):
     text: str = Field(..., description="Natural language text to check", min_length=1)
     context_id: str = Field(..., description="Context identifier to check against", min_length=1)
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "text": "Bob is a designer",
@@ -55,7 +55,7 @@ class BatchParseRequest(BaseModel):
     context_id: str = Field(..., description="Context identifier for all statements", min_length=1)
     use_cache: bool = Field(True, description="Whether to use cached results")
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "texts": ["John is a manager", "Alice is an engineer"],
@@ -75,7 +75,7 @@ class EntityResponse(BaseModel):
     name: str = Field(..., description="Entity name")
     entity_type: Optional[str] = Field(None, description="Entity type (if known)")
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "name": "john",
@@ -90,7 +90,7 @@ class RelationResponse(BaseModel):
     verb: str = Field(..., description="Verb or action")
     relation_type: Optional[str] = Field(None, description="Relation type (if known)")
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "verb": "is",
@@ -113,7 +113,7 @@ class LogicalFormResponse(BaseModel):
     confidence_score: float = Field(..., description="Confidence in parsing", ge=0.0, le=1.0)
     timestamp: datetime = Field(..., description="When this form was created")
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "id": "abc123",
@@ -138,7 +138,7 @@ class ViolationResponse(BaseModel):
     conflicting_form_ids: List[str] = Field(..., description="IDs of conflicting forms")
     severity: str = Field(..., description="Severity level")
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "violation_type": "direct_contradiction",
@@ -157,7 +157,7 @@ class ConsistencyReportResponse(BaseModel):
     form: Optional[LogicalFormResponse] = Field(None, description="Parsed logical form")
     checked_at: datetime = Field(..., description="When the check was performed")
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "is_consistent": False,
@@ -179,7 +179,7 @@ class SearchResult(BaseModel):
     form: LogicalFormResponse = Field(..., description="The logical form")
     similarity_score: float = Field(..., description="Similarity to query", ge=0.0, le=1.0)
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "form": {
@@ -206,7 +206,7 @@ class SearchResponse(BaseModel):
     results: List[SearchResult] = Field(..., description="List of results")
     total_count: int = Field(..., description="Total number of results")
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "query": "managers",
@@ -224,7 +224,7 @@ class ContextInfo(BaseModel):
     sample_statements: List[str] = Field(..., description="Sample statements from context")
     created_at: Optional[datetime] = Field(None, description="When context was created")
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "context_id": "team-db",
@@ -241,7 +241,7 @@ class ContextsResponse(BaseModel):
     contexts: List[ContextInfo] = Field(..., description="List of available contexts")
     total_count: int = Field(..., description="Total number of contexts")
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "contexts": [],
@@ -258,7 +258,7 @@ class HealthResponse(BaseModel):
     timestamp: datetime = Field(..., description="Current server time")
     components: Dict[str, str] = Field(..., description="Status of system components")
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "status": "healthy",
@@ -281,7 +281,7 @@ class ErrorResponse(BaseModel):
     details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
     timestamp: datetime = Field(..., description="When the error occurred")
 
-model_config = ConfigDict(
+    model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "error": "ValidationError",

@@ -153,7 +153,7 @@ def parse_statement(request: ParseRequest):
     except ParsingError as e:
         logger.error(f"Parsing error: {e}")
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"Failed to parse statement: {str(e)}"
         )
     except ValidationError as e:
@@ -247,7 +247,7 @@ def check_consistency(request: CheckRequest):
             ViolationResponse(
                 violation_type=v.violation_type,
                 explanation=v.explanation,
-                conflicting_form_ids=[str(f) for f in v.conflicting_forms] if v.conflicting_forms else [],
+                conflicting_form_ids=[str(f.form_id) for f in v.conflicting_forms] if v.conflicting_forms else [],
                 severity=getattr(v, 'severity', 'medium')
             )
             for v in report.violations

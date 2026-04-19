@@ -12,8 +12,10 @@ from fastapi.testclient import TestClient
 from glcs.api.app import app
 from glcs.api.routes import initialize_glcs
 
-# Initialize GLCS before running tests
-initialize_glcs(in_memory=True)
+@pytest.fixture(autouse=True, scope="session")
+def setup_glcs():
+    """Initialize GLCS before running tests."""
+    initialize_glcs(in_memory=True)
 
 # Create test client
 client = TestClient(app)
@@ -362,6 +364,46 @@ def test_redoc():
     """Test ReDoc is accessible."""
     response = client.get("/redoc")
     assert response.status_code == 200
+
+
+from unittest.mock import patch
+
+def test_parse_stores_in_memory():
+    """Test that parsing a statement stores the form in memory."""
+    with patch("glcs.api.routes.glcs.encoder.add_embedding_to_form") as mock_add_embedding, \
+         patch("glcs.api.routes.glcs.memory.store_form") as mock_store:
+         
+        response = client.post("/api/v1/parse", json={
+            "text": "Zack is a teacher",
+            "context_id": "test-ctx-mem-1"
+        })
+        
+        assert response.status_code == 200
+        assert mock_add_embedding.called
+        assert mock_store.called
+
+def test_batch_parse_stores_in_memory():
+    """Test that batch parsing statements stores forms in memory."""
+    with patch("glcs.api.routes.glcs.encoder.add_embeddings_to_forms") as mock_add_embeddings, \
+         patch("glcs.api.routes.glcs.memory.store_form") as mock_store:
+         
+        response = client.post("/api/v1/parse/batch", json={
+            "texts": ["Yara is a student", "Xavier is a principal"],
+            "context_id": "test-ctx-mem-2"
+        })
+        
+        assert response.status_code == 200
+        assert mock_add_embeddings.called
+        assert mock_store.call_count == 2
+
+def test_parse_memory_error_handled():
+    """Test that failures in memory storage are handled appropriately."""
+    with patch("glcs.api.routes.glcs.memory.store_form", side_effect=Exception("Memory error")):
+        response = client.post("/api/v1/parse", json={
+            "text": "Zack is a teacher",
+            "context_id": "test-ctx-mem-fail"
+        })
+        assert response.status_code == 500
 
 
 if __name__ == "__main__":
