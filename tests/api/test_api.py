@@ -8,9 +8,9 @@ Version: 2.1.0 (Stage 2.1)
 """
 
 import pytest
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from glcs.api.app import app
-from glcs.api.routes import initialize_glcs
 
 # Create test client
 client = TestClient(app)
@@ -361,8 +361,6 @@ def test_redoc():
     assert response.status_code == 200
 
 
-from unittest.mock import patch
-
 def test_parse_stores_in_memory():
     """Test that parsing a statement stores the form in memory."""
     with patch("glcs.api.routes.glcs.encoder.add_embedding_to_form") as mock_add_embedding, \
@@ -392,13 +390,13 @@ def test_batch_parse_stores_in_memory():
         assert mock_store.call_count == 2
 
 def test_parse_memory_error_handled():
-    """Test that failures in memory storage are handled appropriately."""
+    """Test that a memory storage failure does not fail the parse response."""
     with patch("glcs.api.routes.glcs.memory.store_form", side_effect=Exception("Memory error")):
         response = client.post("/api/v1/parse", json={
             "text": "Zack is a teacher",
             "context_id": "test-ctx-mem-fail"
         })
-        assert response.status_code == 500
+        assert response.status_code == 200
 
 
 if __name__ == "__main__":

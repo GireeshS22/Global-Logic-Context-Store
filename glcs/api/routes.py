@@ -140,9 +140,12 @@ def parse_statement(request: ParseRequest):
             use_cache=request.use_cache
         )
 
-        # Add embedding and store in memory
-        glcs.encoder.add_embedding_to_form(form)
-        glcs.memory.store_form(form)
+        # Add embedding and store in memory (non-fatal — parse result is still returned on failure)
+        try:
+            glcs.encoder.add_embedding_to_form(form)
+            glcs.memory.store_form(form)
+        except Exception as e:
+            logger.warning(f"Memory storage failed (non-fatal): {e}")
 
         # Convert to response model
         response = _logical_form_to_response(form)
@@ -197,10 +200,13 @@ def parse_batch(request: BatchParseRequest):
             use_cache=request.use_cache
         )
 
-        # Add embeddings and store in memory
-        glcs.encoder.add_embeddings_to_forms(forms)
-        for form in forms:
-            glcs.memory.store_form(form)
+        # Add embeddings and store in memory (non-fatal — parse results are still returned on failure)
+        try:
+            glcs.encoder.add_embeddings_to_forms(forms)
+            for form in forms:
+                glcs.memory.store_form(form)
+        except Exception as e:
+            logger.warning(f"Memory storage failed (non-fatal): {e}")
 
         # Convert to response models
         responses = [_logical_form_to_response(form) for form in forms]

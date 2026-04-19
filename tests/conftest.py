@@ -9,10 +9,13 @@ def setup_glcs():
 
 @pytest.fixture
 def advanced_glcs():
-    """Create AdvancedGLCS instance with in-memory storage for testing."""
-    return AdvancedGLCS(
-        parser_provider='ollama',
-        encoder_model='all-mpnet-base-v2',
-        in_memory=True,  # Use in-memory for faster tests
-        collection_name='test_advanced',
-    )
+    """Create AdvancedGLCS instance with in-memory storage for testing. Requires Ollama running."""
+    try:
+        return AdvancedGLCS(
+            parser_provider='ollama',
+            encoder_model='all-mpnet-base-v2',
+            in_memory=True,
+            collection_name='test_advanced',
+        )
+    except Exception:
+        pytest.skip("Ollama not available")
