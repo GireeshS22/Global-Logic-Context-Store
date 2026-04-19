@@ -10,6 +10,10 @@ Version: 2.1.0 (Stage 2.1)
 import pytest
 from fastapi.testclient import TestClient
 from glcs.api.app import app
+from glcs.api.routes import initialize_glcs
+
+# Initialize GLCS before running tests
+initialize_glcs(in_memory=True)
 
 # Create test client
 client = TestClient(app)

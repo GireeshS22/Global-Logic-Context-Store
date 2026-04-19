@@ -53,7 +53,7 @@ def initialize_glcs(
 def _logical_form_to_response(form: LogicalForm) -> LogicalFormResponse:
     """Convert LogicalForm to API response model."""
     return LogicalFormResponse(
-        id=form.id,
+        id=str(form.form_id),
         context_id=form.context_id,
         source_text=form.source_text,
         logical_type=form.logical_type.value,
@@ -140,6 +140,10 @@ def parse_statement(request: ParseRequest):
             use_cache=request.use_cache
         )
 
+        # Add embedding and store in memory
+        glcs.encoder.add_embedding_to_form(form)
+        glcs.memory.store_form(form)
+
         # Convert to response model
         response = _logical_form_to_response(form)
 
@@ -149,7 +153,7 @@ def parse_statement(request: ParseRequest):
     except ParsingError as e:
         logger.error(f"Parsing error: {e}")
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=f"Failed to parse statement: {str(e)}"
         )
     except ValidationError as e:
@@ -192,6 +196,11 @@ def parse_batch(request: BatchParseRequest):
             request.context_id,
             use_cache=request.use_cache
         )
+
+        # Add embeddings and store in memory
+        glcs.encoder.add_embeddings_to_forms(forms)
+        for form in forms:
+            glcs.memory.store_form(form)
 
         # Convert to response models
         responses = [_logical_form_to_response(form) for form in forms]
@@ -238,7 +247,7 @@ def check_consistency(request: CheckRequest):
             ViolationResponse(
                 violation_type=v.violation_type,
                 explanation=v.explanation,
-                conflicting_form_ids=[f.id for f in v.conflicting_forms] if v.conflicting_forms else [],
+                conflicting_form_ids=[str(f) for f in v.conflicting_forms] if v.conflicting_forms else [],
                 severity=getattr(v, 'severity', 'medium')
             )
             for v in report.violations

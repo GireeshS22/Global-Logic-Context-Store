@@ -10,7 +10,7 @@ Version: 2.1.0 (Stage 2.1)
 
 from typing import List, Optional, Dict, Any
 from datetime import datetime
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 # ============================================================================
@@ -23,7 +23,7 @@ class ParseRequest(BaseModel):
     context_id: str = Field(..., description="Context identifier for the statement", min_length=1)
     use_cache: bool = Field(True, description="Whether to use cached results if available")
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "text": "John is a manager",
@@ -31,6 +31,7 @@ class ParseRequest(BaseModel):
                 "use_cache": True
             }
         }
+    )
 
 
 class CheckRequest(BaseModel):
@@ -38,22 +39,23 @@ class CheckRequest(BaseModel):
     text: str = Field(..., description="Natural language text to check", min_length=1)
     context_id: str = Field(..., description="Context identifier to check against", min_length=1)
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "text": "Bob is a designer",
                 "context_id": "team-db"
             }
         }
+    )
 
 
 class BatchParseRequest(BaseModel):
     """Request model for POST /parse/batch endpoint."""
-    texts: List[str] = Field(..., description="List of texts to parse", min_items=1)
+    texts: List[str] = Field(..., description="List of texts to parse", min_length=1)
     context_id: str = Field(..., description="Context identifier for all statements", min_length=1)
     use_cache: bool = Field(True, description="Whether to use cached results")
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "texts": ["John is a manager", "Alice is an engineer"],
@@ -61,6 +63,7 @@ class BatchParseRequest(BaseModel):
                 "use_cache": True
             }
         }
+    )
 
 
 # ============================================================================
@@ -72,13 +75,14 @@ class EntityResponse(BaseModel):
     name: str = Field(..., description="Entity name")
     entity_type: Optional[str] = Field(None, description="Entity type (if known)")
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "name": "john",
                 "entity_type": "person"
             }
         }
+    )
 
 
 class RelationResponse(BaseModel):
@@ -86,13 +90,14 @@ class RelationResponse(BaseModel):
     verb: str = Field(..., description="Verb or action")
     relation_type: Optional[str] = Field(None, description="Relation type (if known)")
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "verb": "is",
                 "relation_type": "property"
             }
         }
+    )
 
 
 class LogicalFormResponse(BaseModel):
@@ -108,7 +113,7 @@ class LogicalFormResponse(BaseModel):
     confidence_score: float = Field(..., description="Confidence in parsing", ge=0.0, le=1.0)
     timestamp: datetime = Field(..., description="When this form was created")
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "id": "abc123",
@@ -123,6 +128,7 @@ class LogicalFormResponse(BaseModel):
                 "timestamp": "2025-11-18T12:00:00Z"
             }
         }
+    )
 
 
 class ViolationResponse(BaseModel):
@@ -132,7 +138,7 @@ class ViolationResponse(BaseModel):
     conflicting_form_ids: List[str] = Field(..., description="IDs of conflicting forms")
     severity: str = Field(..., description="Severity level")
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "violation_type": "direct_contradiction",
@@ -141,6 +147,7 @@ class ViolationResponse(BaseModel):
                 "severity": "high"
             }
         }
+    )
 
 
 class ConsistencyReportResponse(BaseModel):
@@ -150,7 +157,7 @@ class ConsistencyReportResponse(BaseModel):
     form: Optional[LogicalFormResponse] = Field(None, description="Parsed logical form")
     checked_at: datetime = Field(..., description="When the check was performed")
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "is_consistent": False,
@@ -164,6 +171,7 @@ class ConsistencyReportResponse(BaseModel):
                 "checked_at": "2025-11-18T12:00:00Z"
             }
         }
+    )
 
 
 class SearchResult(BaseModel):
@@ -171,7 +179,7 @@ class SearchResult(BaseModel):
     form: LogicalFormResponse = Field(..., description="The logical form")
     similarity_score: float = Field(..., description="Similarity to query", ge=0.0, le=1.0)
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "form": {
@@ -189,6 +197,7 @@ class SearchResult(BaseModel):
                 "similarity_score": 0.92
             }
         }
+    )
 
 
 class SearchResponse(BaseModel):
@@ -197,7 +206,7 @@ class SearchResponse(BaseModel):
     results: List[SearchResult] = Field(..., description="List of results")
     total_count: int = Field(..., description="Total number of results")
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "query": "managers",
@@ -205,6 +214,7 @@ class SearchResponse(BaseModel):
                 "total_count": 5
             }
         }
+    )
 
 
 class ContextInfo(BaseModel):
@@ -214,7 +224,7 @@ class ContextInfo(BaseModel):
     sample_statements: List[str] = Field(..., description="Sample statements from context")
     created_at: Optional[datetime] = Field(None, description="When context was created")
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "context_id": "team-db",
@@ -223,6 +233,7 @@ class ContextInfo(BaseModel):
                 "created_at": "2025-11-18T10:00:00Z"
             }
         }
+    )
 
 
 class ContextsResponse(BaseModel):
@@ -230,13 +241,14 @@ class ContextsResponse(BaseModel):
     contexts: List[ContextInfo] = Field(..., description="List of available contexts")
     total_count: int = Field(..., description="Total number of contexts")
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "contexts": [],
                 "total_count": 3
             }
         }
+    )
 
 
 class HealthResponse(BaseModel):
@@ -246,7 +258,7 @@ class HealthResponse(BaseModel):
     timestamp: datetime = Field(..., description="Current server time")
     components: Dict[str, str] = Field(..., description="Status of system components")
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "status": "healthy",
@@ -259,6 +271,7 @@ class HealthResponse(BaseModel):
                 }
             }
         }
+    )
 
 
 class ErrorResponse(BaseModel):
@@ -268,7 +281,7 @@ class ErrorResponse(BaseModel):
     details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
     timestamp: datetime = Field(..., description="When the error occurred")
 
-    class Config:
+model_config = ConfigDict(
         json_schema_extra = {
             "example": {
                 "error": "ValidationError",
@@ -277,3 +290,4 @@ class ErrorResponse(BaseModel):
                 "timestamp": "2025-11-18T12:00:00Z"
             }
         }
+    )
