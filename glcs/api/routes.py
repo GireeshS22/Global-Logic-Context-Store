@@ -7,7 +7,7 @@ Author: GLCS PhD Research Team
 Version: 2.1.0 (Stage 2.1)
 """
 
-from typing import List
+from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -30,7 +30,7 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 # Global GLCS instance (initialized on startup)
-glcs: AdvancedGLCS = None
+glcs: Optional[AdvancedGLCS] = None
 
 
 def initialize_glcs(
@@ -169,7 +169,7 @@ def parse_statement(request: ParseRequest):
         logger.error(f"Unexpected error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal server error: {str(e)}"
+            detail="Internal server error occurred."
         )
 
 
@@ -218,7 +218,7 @@ def parse_batch(request: BatchParseRequest):
         logger.error(f"Batch parse error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Batch parsing failed: {str(e)}"
+            detail="Batch parsing failed due to an internal error."
         )
 
 
@@ -279,7 +279,7 @@ def check_consistency(request: CheckRequest):
         logger.error(f"Check error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Consistency check failed: {str(e)}"
+            detail="Consistency check failed due to an internal error."
         )
 
 
@@ -336,7 +336,7 @@ def search_knowledge(
         logger.error(f"Search error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Search failed: {str(e)}"
+            detail="Search failed due to an internal error."
         )
 
 
@@ -389,7 +389,7 @@ def list_contexts():
         logger.error(f"List contexts error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list contexts: {str(e)}"
+            detail="Failed to list contexts due to an internal error."
         )
 
 
@@ -434,5 +434,5 @@ def get_context(context_id: str):
         logger.error(f"Get context error: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get context: {str(e)}"
+            detail="Failed to get context due to an internal error."
         )

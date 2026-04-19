@@ -65,8 +65,8 @@ async def lifespan(app: FastAPI):
         )
         logger.info(" GLCS system initialized successfully")
     except Exception as e:
-        logger.error(f"Failed to initialize GLCS: {e}")
-        logger.warning("API will start but GLCS functionality will be unavailable")
+        logger.critical(f"Failed to initialize GLCS: {e}")
+        raise RuntimeError(f"GLCS initialization failed: {e}") from e
 
     yield
 
@@ -177,9 +177,14 @@ async def log_requests(request: Request, call_next):
 # Exception Handlers
 # ============================================================================
 
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """Global exception handler for unhandled errors."""
+    if isinstance(exc, StarletteHTTPException):
+        raise exc
+
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
 
     error_response = ErrorResponse(

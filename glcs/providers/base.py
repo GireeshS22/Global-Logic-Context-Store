@@ -17,6 +17,10 @@ class ProviderConfig:
     timeout: int = 30
     extra: Dict[str, Any] = field(default_factory=dict)  # #83: avoid mutable default
 
+    def __repr__(self):
+        masked_key = "***" if self.api_key else None
+        return f"ProviderConfig(api_key={masked_key}, model={self.model!r}, temperature={self.temperature}, max_tokens={self.max_tokens}, timeout={self.timeout}, extra={self.extra})"
+
 
 class LLMProvider(ABC):
     """Abstract base class for LLM providers
