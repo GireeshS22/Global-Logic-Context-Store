@@ -89,3 +89,4 @@ data/*.jsonl
 
 # Streamlit cache
 .streamlit/
+.npm-cache/
