@@ -16,17 +16,6 @@ from glcs.core.models import LogicalType, Polarity
 from glcs.utils.exceptions import ParsingError
 
 
-@pytest.fixture
-def advanced_glcs():
-    """Create AdvancedGLCS instance with in-memory storage for testing."""
-    return AdvancedGLCS(
-        parser_provider='ollama',
-        encoder_model='all-mpnet-base-v2',
-        in_memory=True,  # Use in-memory for faster tests
-        collection_name='test_advanced',
-    )
-
-
 class TestFullPipeline:
     """Test complete pipeline from text to storage."""
 

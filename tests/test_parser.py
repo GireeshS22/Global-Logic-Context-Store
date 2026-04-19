@@ -91,7 +91,7 @@ class TestSimpleParser:
         stmt = self.parser.parse("Hello there friend")
         # If it does parse something, that's acceptable for our simple parser
         # The key is that truly random text should not cause crashes
-        assert stmt is None or isinstance(stmt, object)  # Just verify it doesn't crash
+        assert stmt is None or hasattr(stmt, 'type')  # Just verify it doesn't crash
 
     def test_extract_multiple_statements(self):
         """Test extracting multiple statements from text"""

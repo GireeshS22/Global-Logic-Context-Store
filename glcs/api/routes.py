@@ -53,7 +53,7 @@ def initialize_glcs(
 def _logical_form_to_response(form: LogicalForm) -> LogicalFormResponse:
     """Convert LogicalForm to API response model."""
     return LogicalFormResponse(
-        id=form.id,
+        id=str(form.form_id),
         context_id=form.context_id,
         source_text=form.source_text,
         logical_type=form.logical_type.value,
@@ -140,6 +140,13 @@ def parse_statement(request: ParseRequest):
             use_cache=request.use_cache
         )
 
+        # Add embedding and store in memory (non-fatal — parse result is still returned on failure)
+        try:
+            glcs.encoder.add_embedding_to_form(form)
+            glcs.memory.store_form(form)
+        except Exception as e:
+            logger.warning(f"Memory storage failed (non-fatal): {e}")
+
         # Convert to response model
         response = _logical_form_to_response(form)
 
@@ -193,6 +200,14 @@ def parse_batch(request: BatchParseRequest):
             use_cache=request.use_cache
         )
 
+        # Add embeddings and store in memory (non-fatal — parse results are still returned on failure)
+        try:
+            glcs.encoder.add_embeddings_to_forms(forms)
+            for form in forms:
+                glcs.memory.store_form(form)
+        except Exception as e:
+            logger.warning(f"Memory storage failed (non-fatal): {e}")
+
         # Convert to response models
         responses = [_logical_form_to_response(form) for form in forms]
 
@@ -238,7 +253,7 @@ def check_consistency(request: CheckRequest):
             ViolationResponse(
                 violation_type=v.violation_type,
                 explanation=v.explanation,
-                conflicting_form_ids=[f.id for f in v.conflicting_forms] if v.conflicting_forms else [],
+                conflicting_form_ids=[str(f.form_id) for f in v.conflicting_forms] if v.conflicting_forms else [],
                 severity=getattr(v, 'severity', 'medium')
             )
             for v in report.violations

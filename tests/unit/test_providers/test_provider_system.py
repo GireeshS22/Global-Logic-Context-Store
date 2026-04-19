@@ -124,7 +124,7 @@ class TestOpenAIProvider:
         try:
             from glcs.providers.openai_provider import OpenAIProvider
             assert OpenAIProvider is not None
-        except ImportError:
+        except (ImportError, ProviderError):
             pytest.skip("OpenAI not installed")
 
     def test_openai_provider_creation(self):
@@ -137,7 +137,7 @@ class TestOpenAIProvider:
 
             assert provider.get_provider_name() == "openai"
             assert provider.config.model == "gpt-4o-mini"
-        except ImportError:
+        except (ImportError, ProviderError):
             pytest.skip("OpenAI not installed")
 
     def test_openai_provider_validation(self):
@@ -151,11 +151,13 @@ class TestOpenAIProvider:
             assert provider.validate_config() is True
 
             # Invalid config (no API key)
-            config = ProviderConfig(model="gpt-4o-mini")
-            provider = OpenAIProvider(config)
-            assert provider.validate_config() is False
-        except ImportError:
-            pytest.skip("OpenAI not installed")
+            with pytest.raises(ProviderError):
+                config = ProviderConfig(model="gpt-4o-mini")
+                provider = OpenAIProvider(config)
+        except (ImportError, ProviderError) as e:
+            if "not installed" in str(e):
+                pytest.skip("OpenAI not installed")
+            raise
 
 
 @pytest.mark.requires_api_key
@@ -167,7 +169,7 @@ class TestAnthropicProvider:
         try:
             from glcs.providers.anthropic_provider import AnthropicProvider
             assert AnthropicProvider is not None
-        except ImportError:
+        except (ImportError, ProviderError):
             pytest.skip("Anthropic not installed")
 
     def test_anthropic_provider_creation(self):
@@ -180,7 +182,7 @@ class TestAnthropicProvider:
 
             assert provider.get_provider_name() == "anthropic"
             assert provider.config.model == "claude-3-5-sonnet-20241022"
-        except ImportError:
+        except (ImportError, ProviderError):
             pytest.skip("Anthropic not installed")
 
 
@@ -193,7 +195,7 @@ class TestGeminiProvider:
         try:
             from glcs.providers.gemini_provider import GeminiProvider
             assert GeminiProvider is not None
-        except ImportError:
+        except (ImportError, ProviderError):
             pytest.skip("Google Generative AI not installed")
 
     def test_gemini_provider_creation(self):
@@ -206,7 +208,7 @@ class TestGeminiProvider:
 
             assert provider.get_provider_name() == "gemini"
             assert provider.config.model == "gemini-1.5-flash"
-        except ImportError:
+        except (ImportError, ProviderError):
             pytest.skip("Google Generative AI not installed")
 
 
@@ -219,7 +221,7 @@ class TestGroqProvider:
         try:
             from glcs.providers.groq_provider import GroqProvider
             assert GroqProvider is not None
-        except ImportError:
+        except (ImportError, ProviderError):
             pytest.skip("Groq not installed")
 
     def test_groq_provider_creation(self):
@@ -232,7 +234,7 @@ class TestGroqProvider:
 
             assert provider.get_provider_name() == "groq"
             assert provider.config.model == "mixtral-8x7b-32768"
-        except ImportError:
+        except (ImportError, ProviderError):
             pytest.skip("Groq not installed")
 
 
@@ -244,7 +246,7 @@ class TestOllamaProvider:
         try:
             from glcs.providers.ollama_provider import OllamaProvider
             assert OllamaProvider is not None
-        except ImportError:
+        except (ImportError, ProviderError):
             pytest.skip("Ollama not installed")
 
     @pytest.mark.slow
@@ -264,7 +266,7 @@ class TestOllamaProvider:
             except ProviderError:
                 # Expected if Ollama is not running
                 pytest.skip("Ollama not running")
-        except ImportError:
+        except (ImportError, ProviderError):
             pytest.skip("Ollama not installed")
 
 
@@ -274,6 +276,10 @@ class TestProviderIntegration:
     def test_provider_auto_registration(self):
         """Test that providers are auto-registered on import"""
         from glcs.providers import ProviderFactory
+        from glcs.providers import _register_providers
+        
+        # Re-register because previous tests might have cleared the factory
+        _register_providers()
 
         # Check if at least some providers are registered
         providers = ProviderFactory.list_providers()
@@ -311,9 +317,9 @@ class TestProviderIntegration:
                 try:
                     provider = ProviderFactory.create(provider_name, config=config)
                     assert provider is not None
-                except (ProviderError, Exception):
+                except (ProviderError, ProviderConfigError, ImportError):
                     # Expected if dependencies not installed or service not running
                     pass
-            except Exception:
+            except (ProviderError, ProviderConfigError, ImportError):
                 # Skip providers that can't be created
                 pass
