@@ -32,14 +32,6 @@ from glcs.core.models import (
 # ============================================================================
 
 @pytest.fixture
-def encoder():
-    """Provide a fresh SemanticEncoder instance for each test."""
-    # Clear cache to ensure clean state
-    SemanticEncoder.clear_model_cache()
-    return SemanticEncoder()
-
-
-@pytest.fixture
 def sample_texts():
     """Sample texts for testing encoding."""
     return [
@@ -49,20 +41,6 @@ def sample_texts():
         "The sky is blue",
         "Cats are animals"
     ]
-
-
-@pytest.fixture
-def sample_logical_form():
-    """Sample LogicalForm without embedding."""
-    return LogicalForm(
-        context_id="test_session",
-        logical_type=LogicalType.UNIVERSAL_RULE,
-        subject=Entity(name="humans"),
-        predicate=Relation(verb="are"),
-        object=Entity(name="mortal"),
-        polarity=Polarity.POSITIVE,
-        source_text="All humans are mortal"
-    )
 
 
 # ============================================================================

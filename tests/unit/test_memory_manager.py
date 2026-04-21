@@ -15,10 +15,8 @@ Test Coverage:
 
 import pytest
 import numpy as np
-from pathlib import Path
-import tempfile
-import shutil
 from uuid import UUID
+from pathlib import Path
 
 from glcs.core.memory_manager import MemoryManager
 from glcs.core.semantic_encoder import SemanticEncoder
@@ -37,46 +35,7 @@ from glcs.utils.exceptions import GLCSMemoryError
 # ============================================================================
 
 @pytest.fixture
-def temp_dir():
-    """Create a temporary directory for persistent storage tests."""
-    temp_path = tempfile.mkdtemp()
-    yield temp_path
-    # Cleanup after test
-    shutil.rmtree(temp_path, ignore_errors=True)
-
-
-@pytest.fixture
-def memory_manager():
-    """Provide an in-memory MemoryManager for each test."""
-    import uuid
-    # Use unique collection name to ensure test isolation
-    collection_name = f"test_{uuid.uuid4().hex[:8]}"
-    return MemoryManager(collection_name=collection_name, in_memory=True)
-
-
-@pytest.fixture
-def encoder():
-    """Provide a SemanticEncoder for adding embeddings."""
-    SemanticEncoder.clear_model_cache()
-    return SemanticEncoder()
-
-
-@pytest.fixture
-def sample_form():
-    """Create a sample LogicalForm without embedding."""
-    return LogicalForm(
-        context_id="test_session",
-        logical_type=LogicalType.UNIVERSAL_RULE,
-        subject=Entity(name="humans"),
-        predicate=Relation(verb="are"),
-        object=Entity(name="mortal"),
-        polarity=Polarity.POSITIVE,
-        source_text="All humans are mortal"
-    )
-
-
-@pytest.fixture
-def sample_forms():
+def sample_logical_forms():
     """Create multiple sample LogicalForms without embeddings."""
     return [
         LogicalForm(
@@ -149,36 +108,36 @@ def test_memory_manager_custom_collection_name():
 # CRUD OPERATION TESTS
 # ============================================================================
 
-def test_store_form(memory_manager, encoder, sample_form):
+def test_store_form(memory_manager, encoder, sample_logical_form):
     """Test storing a LogicalForm."""
     # Add embedding
-    encoder.add_embedding_to_form(sample_form)
+    encoder.add_embedding_to_form(sample_logical_form)
 
     # Store form
-    form_id = memory_manager.store_form(sample_form)
+    form_id = memory_manager.store_form(sample_logical_form)
 
-    assert form_id == sample_form.form_id
+    assert form_id == sample_logical_form.form_id
     assert memory_manager.count_all_forms() == 1
 
 
-def test_store_form_without_embedding_raises_error(memory_manager, sample_form):
+def test_store_form_without_embedding_raises_error(memory_manager, sample_logical_form):
     """Test that storing form without embedding raises error."""
     with pytest.raises(GLCSMemoryError, match="without embedding"):
-        memory_manager.store_form(sample_form)
+        memory_manager.store_form(sample_logical_form)
 
 
-def test_retrieve_form(memory_manager, encoder, sample_form):
+def test_retrieve_form(memory_manager, encoder, sample_logical_form):
     """Test retrieving a stored LogicalForm."""
     # Store form
-    encoder.add_embedding_to_form(sample_form)
-    form_id = memory_manager.store_form(sample_form)
+    encoder.add_embedding_to_form(sample_logical_form)
+    form_id = memory_manager.store_form(sample_logical_form)
 
     # Retrieve form
     retrieved = memory_manager.retrieve_form(form_id)
 
-    assert retrieved.form_id == sample_form.form_id
-    assert retrieved.source_text == sample_form.source_text
-    assert retrieved.context_id == sample_form.context_id
+    assert retrieved.form_id == sample_logical_form.form_id
+    assert retrieved.source_text == sample_logical_form.source_text
+    assert retrieved.context_id == sample_logical_form.context_id
     assert retrieved.embedding is not None
     assert retrieved.embedding.shape == (768,)
 
@@ -192,19 +151,19 @@ def test_retrieve_nonexistent_form_raises_error(memory_manager):
         memory_manager.retrieve_form(fake_id)
 
 
-def test_update_form(memory_manager, encoder, sample_form):
+def test_update_form(memory_manager, encoder, sample_logical_form):
     """Test updating an existing LogicalForm."""
     # Store original form
-    encoder.add_embedding_to_form(sample_form)
-    form_id = memory_manager.store_form(sample_form)
+    encoder.add_embedding_to_form(sample_logical_form)
+    form_id = memory_manager.store_form(sample_logical_form)
 
     # Modify form
-    sample_form.confidence_score = 0.75
-    sample_form.source_text = "Modified: All humans are mortal"
-    encoder.add_embedding_to_form(sample_form)  # Re-encode
+    sample_logical_form.confidence_score = 0.75
+    sample_logical_form.source_text = "Modified: All humans are mortal"
+    encoder.add_embedding_to_form(sample_logical_form)  # Re-encode
 
     # Update
-    memory_manager.update_form(form_id, sample_form)
+    memory_manager.update_form(form_id, sample_logical_form)
 
     # Retrieve and verify
     updated = memory_manager.retrieve_form(form_id)
@@ -212,22 +171,22 @@ def test_update_form(memory_manager, encoder, sample_form):
     assert updated.source_text == "Modified: All humans are mortal"
 
 
-def test_update_nonexistent_form_raises_error(memory_manager, encoder, sample_form):
+def test_update_nonexistent_form_raises_error(memory_manager, encoder, sample_logical_form):
     """Test that updating non-existent form raises error."""
     from uuid import uuid4
     fake_id = uuid4()
 
-    encoder.add_embedding_to_form(sample_form)
+    encoder.add_embedding_to_form(sample_logical_form)
 
     with pytest.raises(GLCSMemoryError, match="Cannot update non-existent"):
-        memory_manager.update_form(fake_id, sample_form)
+        memory_manager.update_form(fake_id, sample_logical_form)
 
 
-def test_delete_form(memory_manager, encoder, sample_form):
+def test_delete_form(memory_manager, encoder, sample_logical_form):
     """Test deleting a LogicalForm."""
     # Store form
-    encoder.add_embedding_to_form(sample_form)
-    form_id = memory_manager.store_form(sample_form)
+    encoder.add_embedding_to_form(sample_logical_form)
+    form_id = memory_manager.store_form(sample_logical_form)
 
     assert memory_manager.count_all_forms() == 1
 
@@ -245,10 +204,10 @@ def test_delete_form(memory_manager, encoder, sample_form):
 # QUERY OPERATION TESTS
 # ============================================================================
 
-def test_get_forms_by_context(memory_manager, encoder, sample_forms):
+def test_get_forms_by_context(memory_manager, encoder, sample_logical_forms):
     """Test retrieving forms by context ID."""
     # Store forms (2 in session_1, 1 in session_2)
-    for form in sample_forms:
+    for form in sample_logical_forms:
         encoder.add_embedding_to_form(form)
         memory_manager.store_form(form)
 
@@ -267,10 +226,10 @@ def test_get_forms_by_context_empty(memory_manager):
     assert forms == []
 
 
-def test_search_similar_forms(memory_manager, encoder, sample_forms):
+def test_search_similar_forms(memory_manager, encoder, sample_logical_forms):
     """Test semantic similarity search."""
     # Store forms
-    for form in sample_forms:
+    for form in sample_logical_forms:
         encoder.add_embedding_to_form(form)
         memory_manager.store_form(form)
 
@@ -286,10 +245,10 @@ def test_search_similar_forms(memory_manager, encoder, sample_forms):
     assert "humans" in similar[0].source_text.lower() or "mortal" in similar[0].source_text.lower()
 
 
-def test_search_similar_forms_with_context_filter(memory_manager, encoder, sample_forms):
+def test_search_similar_forms_with_context_filter(memory_manager, encoder, sample_logical_forms):
     """Test similarity search with context filtering."""
     # Store forms
-    for form in sample_forms:
+    for form in sample_logical_forms:
         encoder.add_embedding_to_form(form)
         memory_manager.store_form(form)
 
@@ -314,10 +273,10 @@ def test_search_similar_forms_wrong_dimension_raises_error(memory_manager):
         memory_manager.search_similar_forms(wrong_embedding)
 
 
-def test_search_by_entity(memory_manager, encoder, sample_forms):
+def test_search_by_entity(memory_manager, encoder, sample_logical_forms):
     """Test searching by entity name."""
     # Store forms
-    for form in sample_forms:
+    for form in sample_logical_forms:
         encoder.add_embedding_to_form(form)
         memory_manager.store_form(form)
 
@@ -328,10 +287,10 @@ def test_search_by_entity(memory_manager, encoder, sample_forms):
     assert all("socrates" in form.source_text.lower() for form in socrates_forms)
 
 
-def test_search_by_entity_no_results(memory_manager, encoder, sample_forms):
+def test_search_by_entity_no_results(memory_manager, encoder, sample_logical_forms):
     """Test searching for non-existent entity."""
     # Store forms
-    for form in sample_forms:
+    for form in sample_logical_forms:
         encoder.add_embedding_to_form(form)
         memory_manager.store_form(form)
 
@@ -340,10 +299,10 @@ def test_search_by_entity_no_results(memory_manager, encoder, sample_forms):
     assert results == []
 
 
-def test_search_by_relation(memory_manager, encoder, sample_forms):
+def test_search_by_relation(memory_manager, encoder, sample_logical_forms):
     """Test searching by relation/predicate."""
     # Store forms
-    for form in sample_forms:
+    for form in sample_logical_forms:
         encoder.add_embedding_to_form(form)
         memory_manager.store_form(form)
 
@@ -362,13 +321,13 @@ def test_search_by_relation(memory_manager, encoder, sample_forms):
 # CONTEXT MANAGEMENT TESTS
 # ============================================================================
 
-def test_list_contexts(memory_manager, encoder, sample_forms):
+def test_list_contexts(memory_manager, encoder, sample_logical_forms):
     """Test listing all contexts."""
     # Initially empty
     assert memory_manager.list_contexts() == []
 
     # Store forms
-    for form in sample_forms:
+    for form in sample_logical_forms:
         encoder.add_embedding_to_form(form)
         memory_manager.store_form(form)
 
@@ -381,10 +340,10 @@ def test_list_contexts(memory_manager, encoder, sample_forms):
     assert contexts == sorted(contexts)  # Should be sorted
 
 
-def test_clear_context(memory_manager, encoder, sample_forms):
+def test_clear_context(memory_manager, encoder, sample_logical_forms):
     """Test clearing all forms in a context."""
     # Store forms
-    for form in sample_forms:
+    for form in sample_logical_forms:
         encoder.add_embedding_to_form(form)
         memory_manager.store_form(form)
 
@@ -411,10 +370,10 @@ def test_clear_empty_context(memory_manager):
     assert deleted == 0
 
 
-def test_get_context_stats(memory_manager, encoder, sample_forms):
+def test_get_context_stats(memory_manager, encoder, sample_logical_forms):
     """Test getting statistics for a context."""
     # Store forms in session_1
-    for form in sample_forms[:2]:  # Only first 2 forms
+    for form in sample_logical_forms[:2]:  # Only first 2 forms
         encoder.add_embedding_to_form(form)
         memory_manager.store_form(form)
 
@@ -438,12 +397,12 @@ def test_get_context_stats_empty_context(memory_manager):
     assert stats["avg_confidence"] == 0.0
 
 
-def test_count_all_forms(memory_manager, encoder, sample_forms):
+def test_count_all_forms(memory_manager, encoder, sample_logical_forms):
     """Test counting total forms in database."""
     assert memory_manager.count_all_forms() == 0
 
     # Store forms
-    for form in sample_forms:
+    for form in sample_logical_forms:
         encoder.add_embedding_to_form(form)
         memory_manager.store_form(form)
 
@@ -454,12 +413,12 @@ def test_count_all_forms(memory_manager, encoder, sample_forms):
 # PERSISTENCE TESTS
 # ============================================================================
 
-def test_persistent_storage_survives_restart(temp_dir, encoder, sample_form):
+def test_persistent_storage_survives_restart(temp_dir, encoder, sample_logical_form):
     """Test that data persists across MemoryManager restarts."""
     # Create first manager and store form
     manager1 = MemoryManager(persist_directory=temp_dir, in_memory=False)
-    encoder.add_embedding_to_form(sample_form)
-    form_id = manager1.store_form(sample_form)
+    encoder.add_embedding_to_form(sample_logical_form)
+    form_id = manager1.store_form(sample_logical_form)
 
     assert manager1.count_all_forms() == 1
 
@@ -470,7 +429,7 @@ def test_persistent_storage_survives_restart(temp_dir, encoder, sample_form):
     assert manager2.count_all_forms() == 1
 
     retrieved = manager2.retrieve_form(form_id)
-    assert retrieved.source_text == sample_form.source_text
+    assert retrieved.source_text == sample_logical_form.source_text
 
 
 # ============================================================================
@@ -559,22 +518,22 @@ def test_full_workflow_integration(memory_manager, encoder):
 # ERROR HANDLING TESTS
 # ============================================================================
 
-def test_store_form_handles_chromadb_errors(memory_manager, encoder, sample_form):
+def test_store_form_handles_chromadb_errors(memory_manager, encoder, sample_logical_form):
     """Test error handling when storing duplicate IDs."""
-    encoder.add_embedding_to_form(sample_form)
+    encoder.add_embedding_to_form(sample_logical_form)
 
     # Store form successfully first
-    form_id1 = memory_manager.store_form(sample_form)
-    assert form_id1 == sample_form.form_id
+    form_id1 = memory_manager.store_form(sample_logical_form)
+    assert form_id1 == sample_logical_form.form_id
 
     # ChromaDB allows storing same ID again (it updates instead of failing)
     # So this test verifies that it doesn't crash
-    form_id2 = memory_manager.store_form(sample_form)
-    assert form_id2 == sample_form.form_id
+    form_id2 = memory_manager.store_form(sample_logical_form)
+    assert form_id2 == sample_logical_form.form_id
 
     # Verify form is still there
     retrieved = memory_manager.retrieve_form(form_id1)
-    assert retrieved.form_id == sample_form.form_id
+    assert retrieved.form_id == sample_logical_form.form_id
 
 
 def test_retrieve_form_handles_errors(memory_manager):
@@ -590,28 +549,28 @@ def test_retrieve_form_handles_errors(memory_manager):
 # RECONSTRUCTION TESTS
 # ============================================================================
 
-def test_form_reconstruction_preserves_data(memory_manager, encoder, sample_form):
+def test_form_reconstruction_preserves_data(memory_manager, encoder, sample_logical_form):
     """Test that LogicalForm reconstruction preserves all data."""
-    encoder.add_embedding_to_form(sample_form)
-    original_id = sample_form.form_id
-    original_timestamp = sample_form.timestamp
-    original_embedding = sample_form.embedding.copy()
+    encoder.add_embedding_to_form(sample_logical_form)
+    original_id = sample_logical_form.form_id
+    original_timestamp = sample_logical_form.timestamp
+    original_embedding = sample_logical_form.embedding.copy()
 
     # Store and retrieve
-    memory_manager.store_form(sample_form)
+    memory_manager.store_form(sample_logical_form)
     retrieved = memory_manager.retrieve_form(original_id)
 
     # Verify all fields match
     assert retrieved.form_id == original_id
-    assert retrieved.context_id == sample_form.context_id
+    assert retrieved.context_id == sample_logical_form.context_id
     assert retrieved.timestamp == original_timestamp
-    assert retrieved.logical_type == sample_form.logical_type
-    assert retrieved.subject.name == sample_form.subject.name
-    assert retrieved.predicate.verb == sample_form.predicate.verb
-    assert retrieved.object.name == sample_form.object.name
-    assert retrieved.polarity == sample_form.polarity
-    assert retrieved.confidence_score == sample_form.confidence_score
-    assert retrieved.source_text == sample_form.source_text
+    assert retrieved.logical_type == sample_logical_form.logical_type
+    assert retrieved.subject.name == sample_logical_form.subject.name
+    assert retrieved.predicate.verb == sample_logical_form.predicate.verb
+    assert retrieved.object.name == sample_logical_form.object.name
+    assert retrieved.polarity == sample_logical_form.polarity
+    assert retrieved.confidence_score == sample_logical_form.confidence_score
+    assert retrieved.source_text == sample_logical_form.source_text
     assert np.allclose(retrieved.embedding, original_embedding)
 
 

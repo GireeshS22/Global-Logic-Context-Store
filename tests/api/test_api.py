@@ -11,18 +11,24 @@ import pytest
 from unittest.mock import patch
 from fastapi.testclient import TestClient
 from glcs.api.app import app
+from glcs.api.routes import initialize_glcs
 
-# Create test client
-client = TestClient(app)
+@pytest.fixture(scope="module")
+def api_client():
+    """Create a test client that triggers lifespan events."""
+    # Ensure GLCS is initialized in-memory for tests
+    initialize_glcs(in_memory=True)
+    with TestClient(app) as c:
+        yield c
 
 
 # ============================================================================
 # Root & Health Tests
 # ============================================================================
 
-def test_root_endpoint():
+def test_root_endpoint(api_client):
     """Test root endpoint returns API information."""
-    response = client.get("/")
+    response = api_client.get("/")
     assert response.status_code == 200
     data = response.json()
     assert data["name"] == "GLCS REST API"
@@ -31,9 +37,9 @@ def test_root_endpoint():
     assert "endpoints" in data
 
 
-def test_health_endpoint():
+def test_health_endpoint(api_client):
     """Test health check endpoint."""
-    response = client.get("/api/v1/health")
+    response = api_client.get("/api/v1/health")
     assert response.status_code == 200
     data = response.json()
     assert "status" in data
@@ -46,9 +52,9 @@ def test_health_endpoint():
 # Parse Endpoint Tests
 # ============================================================================
 
-def test_parse_simple_statement():
+def test_parse_simple_statement(api_client):
     """Test parsing a simple statement."""
-    response = client.post("/api/v1/parse", json={
+    response = api_client.post("/api/v1/parse", json={
         "text": "John is a manager",
         "context_id": "test-ctx-1"
     })
@@ -71,7 +77,7 @@ def test_parse_simple_statement():
     assert data["predicate"]["verb"] == "is"
 
 
-def test_parse_with_cache():
+def test_parse_with_cache(api_client):
     """Test parsing with caching enabled."""
     request_data = {
         "text": "Alice is an engineer",
@@ -80,37 +86,37 @@ def test_parse_with_cache():
     }
 
     # First request
-    response1 = client.post("/api/v1/parse", json=request_data)
+    response1 = api_client.post("/api/v1/parse", json=request_data)
     assert response1.status_code == 200
 
     # Second request (should use cache)
-    response2 = client.post("/api/v1/parse", json=request_data)
+    response2 = api_client.post("/api/v1/parse", json=request_data)
     assert response2.status_code == 200
 
     # Results should be identical
     assert response1.json()["source_text"] == response2.json()["source_text"]
 
 
-def test_parse_missing_text():
+def test_parse_missing_text(api_client):
     """Test parsing with missing text field."""
-    response = client.post("/api/v1/parse", json={
+    response = api_client.post("/api/v1/parse", json={
         "context_id": "test-ctx-3"
     })
     assert response.status_code == 422  # Validation error
 
 
-def test_parse_empty_text():
+def test_parse_empty_text(api_client):
     """Test parsing with empty text."""
-    response = client.post("/api/v1/parse", json={
+    response = api_client.post("/api/v1/parse", json={
         "text": "",
         "context_id": "test-ctx-4"
     })
     assert response.status_code == 422  # Validation error
 
 
-def test_parse_missing_context():
+def test_parse_missing_context(api_client):
     """Test parsing with missing context_id."""
-    response = client.post("/api/v1/parse", json={
+    response = api_client.post("/api/v1/parse", json={
         "text": "Bob is a developer"
     })
     assert response.status_code == 422  # Validation error
@@ -120,9 +126,9 @@ def test_parse_missing_context():
 # Batch Parse Tests
 # ============================================================================
 
-def test_batch_parse():
+def test_batch_parse(api_client):
     """Test batch parsing multiple statements."""
-    response = client.post("/api/v1/parse/batch", json={
+    response = api_client.post("/api/v1/parse/batch", json={
         "texts": [
             "Charlie is a designer",
             "Diana is a manager",
@@ -143,9 +149,9 @@ def test_batch_parse():
     assert "predicate" in data[0]
 
 
-def test_batch_parse_empty_list():
+def test_batch_parse_empty_list(api_client):
     """Test batch parsing with empty list."""
-    response = client.post("/api/v1/parse/batch", json={
+    response = api_client.post("/api/v1/parse/batch", json={
         "texts": [],
         "context_id": "test-ctx-batch-2"
     })
@@ -156,16 +162,16 @@ def test_batch_parse_empty_list():
 # Consistency Check Tests
 # ============================================================================
 
-def test_check_consistency_simple():
+def test_check_consistency_simple(api_client):
     """Test consistency checking."""
     # First, add a statement
-    client.post("/api/v1/parse", json={
+    api_client.post("/api/v1/parse", json={
         "text": "Frank is a developer",
         "context_id": "test-ctx-check-1"
     })
 
     # Check a new statement
-    response = client.post("/api/v1/check", json={
+    response = api_client.post("/api/v1/check", json={
         "text": "Frank is an engineer",
         "context_id": "test-ctx-check-1"
     })
@@ -177,9 +183,9 @@ def test_check_consistency_simple():
     assert isinstance(data["violations"], list)
 
 
-def test_check_missing_text():
+def test_check_missing_text(api_client):
     """Test consistency check with missing text."""
-    response = client.post("/api/v1/check", json={
+    response = api_client.post("/api/v1/check", json={
         "context_id": "test-ctx-check-2"
     })
     assert response.status_code == 422
@@ -189,20 +195,20 @@ def test_check_missing_text():
 # Search Tests
 # ============================================================================
 
-def test_search_knowledge():
+def test_search_knowledge(api_client):
     """Test semantic search."""
     # First, add some statements
-    client.post("/api/v1/parse", json={
+    api_client.post("/api/v1/parse", json={
         "text": "Grace is a manager",
         "context_id": "test-ctx-search-1"
     })
-    client.post("/api/v1/parse", json={
+    api_client.post("/api/v1/parse", json={
         "text": "Heidi is a developer",
         "context_id": "test-ctx-search-1"
     })
 
     # Search
-    response = client.get("/api/v1/search", params={
+    response = api_client.get("/api/v1/search", params={
         "query": "manager",
         "context_id": "test-ctx-search-1"
     })
@@ -216,9 +222,9 @@ def test_search_knowledge():
     assert "total_count" in data
 
 
-def test_search_with_limit():
+def test_search_with_limit(api_client):
     """Test search with result limit."""
-    response = client.get("/api/v1/search", params={
+    response = api_client.get("/api/v1/search", params={
         "query": "engineer",
         "context_id": "test-ctx-search-2",
         "limit": 5
@@ -228,17 +234,17 @@ def test_search_with_limit():
     assert len(data["results"]) <= 5
 
 
-def test_search_missing_query():
+def test_search_missing_query(api_client):
     """Test search with missing query parameter."""
-    response = client.get("/api/v1/search", params={
+    response = api_client.get("/api/v1/search", params={
         "context_id": "test-ctx-search-3"
     })
     assert response.status_code == 422
 
 
-def test_search_missing_context():
+def test_search_missing_context(api_client):
     """Test search with missing context_id."""
-    response = client.get("/api/v1/search", params={
+    response = api_client.get("/api/v1/search", params={
         "query": "test"
     })
     assert response.status_code == 422
@@ -248,20 +254,20 @@ def test_search_missing_context():
 # Context Management Tests
 # ============================================================================
 
-def test_list_contexts():
+def test_list_contexts(api_client):
     """Test listing all contexts."""
     # Add some data to create contexts
-    client.post("/api/v1/parse", json={
+    api_client.post("/api/v1/parse", json={
         "text": "Ivan is a manager",
         "context_id": "test-ctx-list-1"
     })
-    client.post("/api/v1/parse", json={
+    api_client.post("/api/v1/parse", json={
         "text": "Judy is a developer",
         "context_id": "test-ctx-list-2"
     })
 
     # List contexts
-    response = client.get("/api/v1/contexts")
+    response = api_client.get("/api/v1/contexts")
     assert response.status_code == 200
     data = response.json()
 
@@ -271,16 +277,16 @@ def test_list_contexts():
     assert data["total_count"] >= 2
 
 
-def test_get_specific_context():
+def test_get_specific_context(api_client):
     """Test getting a specific context."""
     # Create context
-    client.post("/api/v1/parse", json={
+    api_client.post("/api/v1/parse", json={
         "text": "Kevin is an engineer",
         "context_id": "test-ctx-specific-1"
     })
 
     # Get context
-    response = client.get("/api/v1/contexts/test-ctx-specific-1")
+    response = api_client.get("/api/v1/contexts/test-ctx-specific-1")
     assert response.status_code == 200
     data = response.json()
 
@@ -290,9 +296,9 @@ def test_get_specific_context():
     assert data["total_forms"] >= 1
 
 
-def test_get_nonexistent_context():
+def test_get_nonexistent_context(api_client):
     """Test getting a non-existent context."""
-    response = client.get("/api/v1/contexts/nonexistent-context-12345")
+    response = api_client.get("/api/v1/contexts/nonexistent-context-12345")
     # Should return 404 or empty context
     assert response.status_code in [404, 200]
 
@@ -301,10 +307,10 @@ def test_get_nonexistent_context():
 # Edge Cases & Error Handling
 # ============================================================================
 
-def test_parse_very_long_text():
+def test_parse_very_long_text(api_client):
     """Test parsing very long text."""
     long_text = "This is a test statement. " * 100
-    response = client.post("/api/v1/parse", json={
+    response = api_client.post("/api/v1/parse", json={
         "text": long_text,
         "context_id": "test-ctx-long"
     })
@@ -312,9 +318,9 @@ def test_parse_very_long_text():
     assert response.status_code in [200, 400, 422]
 
 
-def test_parse_special_characters():
+def test_parse_special_characters(api_client):
     """Test parsing text with special characters."""
-    response = client.post("/api/v1/parse", json={
+    response = api_client.post("/api/v1/parse", json={
         "text": "John's resume is impressive! @#$%",
         "context_id": "test-ctx-special"
     })
@@ -322,16 +328,16 @@ def test_parse_special_characters():
     assert response.status_code in [200, 400, 422]
 
 
-def test_invalid_endpoint():
+def test_invalid_endpoint(api_client):
     """Test accessing invalid endpoint."""
-    response = client.get("/api/v1/invalid-endpoint-12345")
+    response = api_client.get("/api/v1/invalid-endpoint-12345")
     assert response.status_code == 404
 
 
-def test_wrong_http_method():
+def test_wrong_http_method(api_client):
     """Test using wrong HTTP method."""
     # GET instead of POST for parse
-    response = client.get("/api/v1/parse")
+    response = api_client.get("/api/v1/parse")
     assert response.status_code == 405  # Method not allowed
 
 
@@ -339,9 +345,9 @@ def test_wrong_http_method():
 # Documentation Tests
 # ============================================================================
 
-def test_openapi_docs():
+def test_openapi_docs(api_client):
     """Test OpenAPI documentation is accessible."""
-    response = client.get("/openapi.json")
+    response = api_client.get("/openapi.json")
     assert response.status_code == 200
     data = response.json()
     assert "openapi" in data
@@ -349,24 +355,24 @@ def test_openapi_docs():
     assert "paths" in data
 
 
-def test_swagger_ui():
+def test_swagger_ui(api_client):
     """Test Swagger UI is accessible."""
-    response = client.get("/docs")
+    response = api_client.get("/docs")
     assert response.status_code == 200
 
 
-def test_redoc():
+def test_redoc(api_client):
     """Test ReDoc is accessible."""
-    response = client.get("/redoc")
+    response = api_client.get("/redoc")
     assert response.status_code == 200
 
 
-def test_parse_stores_in_memory():
+def test_parse_stores_in_memory(api_client):
     """Test that parsing a statement stores the form in memory."""
     with patch("glcs.api.routes.glcs.encoder.add_embedding_to_form") as mock_add_embedding, \
          patch("glcs.api.routes.glcs.memory.store_form") as mock_store:
          
-        response = client.post("/api/v1/parse", json={
+        response = api_client.post("/api/v1/parse", json={
             "text": "Zack is a teacher",
             "context_id": "test-ctx-mem-1"
         })
@@ -375,12 +381,12 @@ def test_parse_stores_in_memory():
         assert mock_add_embedding.called
         assert mock_store.called
 
-def test_batch_parse_stores_in_memory():
+def test_batch_parse_stores_in_memory(api_client):
     """Test that batch parsing statements stores forms in memory."""
     with patch("glcs.api.routes.glcs.encoder.add_embeddings_to_forms") as mock_add_embeddings, \
          patch("glcs.api.routes.glcs.memory.store_form") as mock_store:
          
-        response = client.post("/api/v1/parse/batch", json={
+        response = api_client.post("/api/v1/parse/batch", json={
             "texts": ["Yara is a student", "Xavier is a principal"],
             "context_id": "test-ctx-mem-2"
         })
@@ -389,10 +395,10 @@ def test_batch_parse_stores_in_memory():
         assert mock_add_embeddings.called
         assert mock_store.call_count == 2
 
-def test_parse_memory_error_handled():
+def test_parse_memory_error_handled(api_client):
     """Test that a memory storage failure does not fail the parse response."""
     with patch("glcs.api.routes.glcs.memory.store_form", side_effect=Exception("Memory error")):
-        response = client.post("/api/v1/parse", json={
+        response = api_client.post("/api/v1/parse", json={
             "text": "Zack is a teacher",
             "context_id": "test-ctx-mem-fail"
         })

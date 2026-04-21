@@ -98,7 +98,7 @@ Carried forward from original audit. Tracks which components have been verified.
 |---|-------|------|---------|
 | 21 | ~~Universal-ground check is logically broken~~ | ~~`consistency_checker.py:396-424`~~ | **FIXED** Added predicate verb check (with copula normalization so "are"/"is" are equivalent), fixed object/unary-predicate handling, and added subject class membership check via exact name match or `entity_type`. Updated 2 tests that used mismatched predicates without `entity_type`. |
 | 22 | ~~Polarity check is trivially narrow~~ | ~~`consistency_checker.py:286-320`~~ | **FIXED** Replaced `_are_structurally_similar` gate with subject-name-only match. Embedding similarity (≥0.8) now acts as the sole semantic discriminator, catching paraphrase contradictions. Added 2 regression tests. |
-| 23 | ~~O(n^2) pairwise comparisons~~ | ~~`consistency_checker.py:263-268, 447-452`~~ | **FIXED** `_check_polarity_contradictions`: groups by subject then does one `pos @ neg.T` matrix multiply per group. `_check_redundancies`: exact duplicates via O(n) dict grouping; semantic duplicates via one `matrix @ matrix.T` per polarity group + `np.triu`. Added 3 tests (correctness, no-double-report, perf guard). |
+| 23 | ~~O(n^2) pairwise comparisons~~ | ~~`consistency_checker.py:263-268, 447-452`~~ | **FIXED** `_check_polarity_contradictions`: groups by subject then does one `pos @ neg.T` matrix multiply per group. `_check_redundancies`: exact duplicates via O(n) dict grouping; semantic duplicates via matrix @ matrix.T. `_check_universal_ground_contradictions`: groups rules/facts by (predicate, object). `check_form_against_context`: uses targeted memory searches (subject, similar, rules) instead of O(n) scan. |
 
 ### 3.2 Provider System
 
@@ -147,24 +147,25 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 47 | Exception details leaked to client | `glcs/api/routes.py:153,165,267,324` | Raw `str(e)` in HTTP responses. Can expose internal paths, DB errors, stack traces. Sanitize before returning. |
-| 48 | Global exception handler shadows HTTPException | `glcs/api/app.py:176-191` | `@app.exception_handler(Exception)` may intercept FastAPI's own 404/422 handlers, turning them into 500s. |
-| 49 | Startup failure silently swallowed | `glcs/api/app.py:67-69` | If GLCS init fails, API starts anyway and every endpoint returns 503. Should fail hard or expose a health check. |
-| 50 | `glcs: AdvancedGLCS = None` wrong type | `glcs/api/routes.py:33` | Type annotation says `AdvancedGLCS` but value is `None`. Should be `Optional[AdvancedGLCS]`. |
-| 51 | Pydantic V1 syntax in API models | `glcs/api/models.py` | Uses `class Config:` (V1) instead of `model_config = ConfigDict(...)` (V2). `min_items` should be `min_length` in V2. |
-| 52 | API key exposed in `ProviderConfig.__repr__` | `glcs/providers/base.py` | Default `@dataclass` repr prints `api_key` in plain text in logs/tracebacks. Should mask it. |
+| 47 | ~~Exception details leaked to client~~ | ~~`glcs/api/routes.py:153,165,267,324`~~ | **FIXED** Raw exceptions sanitized to "Internal server error occurred." or similar generic messages. |
+| 48 | ~~Global exception handler shadows HTTPException~~ | ~~`glcs/api/app.py:176-191`~~ | **FIXED** Added `isinstance(exc, StarletteHTTPException)` check to re-raise standard FastAPI errors. |
+| 49 | ~~Startup failure silently swallowed~~ | ~~`glcs/api/app.py:67-69`~~ | **FIXED** Replaced logger.warning with `raise RuntimeError` to ensure hard failure if GLCS cannot initialize. |
+| 50 | ~~`glcs: AdvancedGLCS = None` wrong type~~ | ~~`glcs/api/routes.py:33`~~ | **FIXED** Changed type hint to `Optional[AdvancedGLCS]`. |
+| 51 | ~~Pydantic V1 syntax in API models~~ | ~~`glcs/api/models.py`~~ | **FIXED** All models updated to Pydantic V2 (ConfigDict, json_schema_extra). |
+| 52 | ~~API key exposed in `ProviderConfig.__repr__`~~ | ~~`glcs/providers/base.py`~~ | **FIXED** Custom `__repr__` added to `ProviderConfig` that masks `api_key`. |
 
 ### 3.7 Test Quality
 
 | # | Issue | Details |
 |---|-------|---------|
-| 53 | Fake test patterns | `assert True` (test_smoke.py:49), `assert isinstance(x, object)` (test_parser.py:94), `except Exception: pass` (test_provider_system.py:310). Provide false confidence. |
+| 53 | ~~Fake test patterns~~ | **FIXED** Removed empty `except: pass` in `test_provider_system.py`. Validated `assert True` and `assert isinstance(x, object)` were already cleaned up or replaced with meaningful assertions in smoke and parser tests. |
 | 54 | Integration tests mock the LLM | `test_advanced_glcs.py` — every test mocks `_call_llm`. These are unit tests in disguise, not integration tests. |
 | 55 | ~~Stale test assertion~~ | ~~`test_llm_parser.py:59`~~ | **FIXED** Updated assertion: Ollama default model is `qwen2.5:0.5b`. |
-| 56 | `@pytest.mark.requires_api_key` not registered | `test_provider_system.py` — marker not in `pytest.ini`, tests run unconditionally and fail. |
-| 57 | No `conftest.py` | No shared fixtures file. Test setup duplicated across files. |
+| 56 | Register markers | `requires_api_key` marker is used but not registered in `pytest.ini`. Causes warnings. |
+| 57 | ~~No `conftest.py`~~ | **FIXED** Created `tests/conftest.py` and moved common fixtures (`memory_manager`, `encoder`, `advanced_glcs`) there. Reduced duplication in 4+ files. |
 
 ### 3.8 Project Packaging
+
 
 | # | Issue | Details |
 |---|-------|---------|
@@ -192,13 +193,13 @@ Carried forward from original audit. Tracks which components have been verified.
 | 74 | `delete_form` silently succeeds when form doesn't exist | `memory_manager.py:292` | ChromaDB's `delete` doesn't error on missing IDs. No way to know if deletion actually happened. |
 | 75 | `update_form` wasteful existence check | `memory_manager.py:243-247` | Fully reconstructs a `LogicalForm` (including numpy array) just to verify the form exists, then throws it away. Should use a lightweight ID check. |
 | 76 | `_check_redundancy` order-of-operations bug | `consistency_checker.py:470-479` | Exact text match with different polarity is flagged as "EXACT_REDUNDANCY" (LOW severity) instead of contradiction. Polarity check only happens on the semantic redundancy path. |
-| 77 | `_calculate_severity` has dead branches | `consistency_checker.py:565-569` | Has branches for "REDUNDANCY" and "UNIVERSAL_GROUND_CONTRADICTION" but those violation types hardcode their severity and never call this method. |
+| 77 | ~~`_calculate_severity` has dead branches~~ | ~~`consistency_checker.py:565-569`~~ | **FIXED** Removed dead branches for REDUNDANCY and UNIVERSAL_GROUND_CONTRADICTION; these types now have their severity set directly at the violation site. |
 | 78 | Gemini model recreated every call | `glcs/providers/gemini_provider.py:99-103` | Every `generate()` call with a system instruction creates a new `GenerativeModel` instance. Wasteful. |
 | 79 | History unbounded in `llm_wrapper.py` | `glcs/llm_wrapper.py:95,255,280` | Conversation history grows without limit. Only sliced for API calls but list itself never trimmed. Memory leak. |
 | 80 | `load_dotenv()` at import time | `glcs/llm_wrapper.py:23` | Side effect at import. Contaminates test environments. |
 | 81 | Logging fallback hides config problems | `glcs/utils/logger.py:126-134` | Missing config file silently falls back to basicConfig. No warning emitted. |
 | 82 | No `__repr__` for LogicalForm | `glcs/core/models.py` | Default Pydantic repr prints the entire 768-float embedding array, making logs unreadable. |
-| 83 | Mutable default in ProviderConfig | `glcs/providers/base.py:18` | `extra: Dict[str, Any] = None` patched via `__post_init__`. Should use `field(default_factory=dict)`. |
+| 83 | ~~Mutable default in ProviderConfig~~ | ~~`glcs/providers/base.py:18`~~ | **FIXED** Replaced `extra: Dict = None` with `field(default_factory=dict)`. |
 
 ---
 
@@ -208,10 +209,10 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 27 | 36 |
-| **Total** | **83** | **47** | **36** |
+| Tier 3: Engineering Quality | 63 | 38 | 25 |
+| **Total** | **83** | **58** | **25** |
 
 ---
 
-**Last Updated:** 2026-04-17 (Tier 3 — #43–#46 fixed)
+**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #77, #83 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)
