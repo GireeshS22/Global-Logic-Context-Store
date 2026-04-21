@@ -192,7 +192,7 @@ Privacy: 100% local - no data leaves your machine
 **Solutions:**
 1. Pull the model: `ollama pull llama3.2`
 2. Check available models: `ollama list`
-3. GLCS will automatically try to pull the model if not found
+3. Update your GLCS provider config to use a model that is already installed, or enable any explicit auto-pull setting only if you want that behavior
 
 ### Slow Performance
 

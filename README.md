@@ -4,6 +4,10 @@
 **Status**: Development
 **License**: MIT
 
+[![Documentation Status](https://readthedocs.org/projects/glcs/badge/?version=latest)](https://glcs.readthedocs.io/en/latest/)
+
+Hosted documentation: https://glcs.readthedocs.io/
+
 ## Overview
 
 GLCS (Global Logical Context Store) is a neuro-symbolic middleware system designed to enforce logical consistency in Large Language Models. It acts as an external validation layer that intercepts, parses, validates, and stores logical statements to prevent model self-contradiction.
