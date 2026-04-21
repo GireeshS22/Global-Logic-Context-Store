@@ -1,60 +1,47 @@
 # GLCS Documentation
 
-This directory contains comprehensive documentation for the Global Logical Context Store project.
+Welcome to the hosted documentation for GLCS. Start here if you installed the package with `pip install glcs` and want a stable reference for the Python API, quickstart flow, provider setup, and REST endpoints.
 
-## Documentation Structure
+## Start Here
 
-### Core Documentation
+- [Quickstart](quickstart.md) - install, initialize, parse, and check consistency
+- [API Reference](api_reference.md) - public Python modules and exports
+- [Provider Guide](PROVIDER_GUIDE.md) - provider setup and comparison
+- [Ollama Setup](OLLAMA_SETUP.md) - local offline setup
+- [REST API Guide](API_GUIDE.md) - HTTP endpoints and examples
+- [LLM Parser Guide](LLM_PARSER_GUIDE.md) - advanced parsing workflow
 
-- **[API.md](API.md)** - REST API endpoints, request/response formats, and usage examples
-- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Architecture overview, component descriptions, and development guidelines
-- **[EVALUATION.md](EVALUATION.md)** - Benchmark results, baseline comparisons, and performance analysis
+## Project Docs
 
-### Implementation Documentation
+- [Build Principles](BUILD_PRINCIPLES.md) - repository conventions and engineering standards
+- [Cascade Review](CASCADE_REVIEW.md) - dependency impact notes for internal changes
+- [Cascade Review Stage 1.5](CASCADE_REVIEW_STAGE1.5.md) - implementation review notes
 
-- **[CASCADE_REVIEW.md](CASCADE_REVIEW.md)** - Tracks dependencies between components and potential cascade effects of changes
+## Read This First
 
-### Research Documentation
+This site documents the current public API surface of GLCS.
 
-- Research papers and technical reports will be added here as the project progresses
+- The simple, stable imports are available from the top-level `glcs` package.
+- The advanced LLM and REST modules are documented here as public APIs, but they may still evolve between releases.
+- Examples in the guides are aligned with the current package version and the current REST API route prefixes.
 
-## Quick Links
+## Documentation Map
 
-### For Users
-- Start with the [main README](../README.md) for installation and quick start
-- See [API.md](API.md) for detailed API usage
+```{toctree}
+:maxdepth: 2
+:caption: Guides
 
-### For Developers
-- Read [DEVELOPMENT.md](DEVELOPMENT.md) for architecture understanding
-- Check [CASCADE_REVIEW.md](CASCADE_REVIEW.md) before making structural changes
-- Module-specific READMEs are located in each package directory
+quickstart
+api_reference
+PROVIDER_GUIDE
+OLLAMA_SETUP
+API_GUIDE
+LLM_PARSER_GUIDE
+BUILD_PRINCIPLES
+CASCADE_REVIEW
+CASCADE_REVIEW_STAGE1.5
+```
 
-### For Researchers
-- See [EVALUATION.md](EVALUATION.md) for experimental results
-- Benchmark datasets are in the `data/` directory
+## Navigation
 
-## Documentation Guidelines
-
-When adding new documentation:
-
-1. **Be Specific**: Include code examples and concrete use cases
-2. **Keep Updated**: Update docs when code changes
-3. **Cross-Reference**: Link to related docs
-4. **Version**: Note which version the docs apply to
-
-## Contributing to Docs
-
-Documentation improvements are welcome! Please:
-- Use Markdown format
-- Follow existing structure
-- Include examples
-- Update this index when adding new docs
-
-## Status
-
-📝 **Current Documentation Status** (Stage 0.1):
-- ✅ Project structure documented
-- ✅ Installation guide complete
-- ⏳ API documentation (coming in Stage 2.1)
-- ⏳ Development guide (in progress)
-- ⏳ Evaluation results (coming in Phase 3)
+Use the Sphinx sidebar to browse the guides and API reference. The same content is available at the hosted docs URL once the Read the Docs project is connected.
