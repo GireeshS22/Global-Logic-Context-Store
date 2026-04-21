@@ -68,4 +68,4 @@ intersphinx_mapping = {
     "pydantic": ("https://docs.pydantic.dev/latest/", None),
 }
 
-master_doc = "README"
+master_doc = "index"
