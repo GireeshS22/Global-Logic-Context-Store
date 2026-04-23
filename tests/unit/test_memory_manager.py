@@ -370,6 +370,27 @@ def test_clear_empty_context(memory_manager):
     assert deleted == 0
 
 
+def test_clear_all(memory_manager, encoder, sample_logical_forms):
+    """Test clearing all forms from all contexts."""
+    # Store forms across multiple contexts
+    for form in sample_logical_forms:
+        encoder.add_embedding_to_form(form)
+        memory_manager.store_form(form)
+    
+    assert memory_manager.count_all_forms() == 3
+    
+    # Clear all
+    deleted = memory_manager.clear_all()
+    assert deleted == 3
+    assert memory_manager.count_all_forms() == 0
+
+
+def test_clear_all_empty(memory_manager):
+    """Test clear_all on an already empty database."""
+    deleted = memory_manager.clear_all()
+    assert deleted == 0
+
+
 def test_get_context_stats(memory_manager, encoder, sample_logical_forms):
     """Test getting statistics for a context."""
     # Store forms in session_1

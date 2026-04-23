@@ -355,6 +355,23 @@ class AdvancedGLCS:
         logger.info(f"Deleted {count} statements")
         return count
 
+    def clear_all(self) -> int:
+        """
+        Clear all statements from all contexts in the knowledge base.
+
+        Returns:
+            Total number of statements deleted
+
+        Example:
+            >>> glcs = AdvancedGLCS()
+            >>> deleted = glcs.clear_all()
+            >>> print(f"Knowledge base reset. {deleted} records removed.")
+        """
+        logger.info("Wiping entire knowledge base")
+        count = self.memory.clear_all()
+        logger.info(f"Deleted {count} statements in total")
+        return count
+
     def get_system_info(self) -> Dict[str, Any]:
         """
         Get information about the GLCS system configuration.

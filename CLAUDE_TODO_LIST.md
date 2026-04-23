@@ -185,7 +185,7 @@ Carried forward from original audit. Tracks which components have been verified.
 | 66 | ~~Missing `embedding_dim` property~~ | ~~`glcs/core/semantic_encoder.py`~~ | **FIXED** `embedding_dim` now exposed as a `@property`. Updated all unit tests to use the property instead of hardcoded 768. |
 | 67 | `search_by_entity` missing `context_id` support | `glcs/core/memory_manager.py` | Integration tests call `search_by_entity(name, context_id=...)` but the method signature or behavior does not properly support the `context_id` filter. |
 | 68 | Missing `save_state()`/`load_state()` methods | `glcs/advanced_wrapper.py` | State persistence is implicit via ChromaDB's `persist_directory`. No explicit save/load API. Should be added for clarity and portability. |
-| 69 | Missing `clear_all()` method | `glcs/core/memory_manager.py` | `clear_context(context_id)` exists but no global `clear_all()` to wipe the entire store. Needed for testing and reset scenarios. |
+| 69 | ~~Missing `clear_all()` method~~ | ~~`glcs/core/memory_manager.py`~~ | **FIXED** `clear_all()` implemented in `MemoryManager` and exposed via `AdvancedGLCS`. Added 2 unit tests and 1 integration test. |
 | 70 | `switch_provider` half-updates on failure | `glcs/core/logical_parser.py:537-555` | Updates `self.provider_name` before `ProviderFactory.create()`. If factory raises, the object is in an inconsistent state (name changed, provider unchanged). |
 | 71 | `_validate_extraction` mutates input | `glcs/core/logical_parser.py:349-365` | A method named "validate" silently mutates the input dict by inserting defaults. Violates single responsibility. |
 | 72 | `parse_batch` silently drops failures | `glcs/core/logical_parser.py:479-485` | Failed items logged as warning but dropped. Caller gets a shorter list with no indication which items failed. |
@@ -209,10 +209,10 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 40 | 23 |
-| **Total** | **83** | **60** | **23** |
+| Tier 3: Engineering Quality | 63 | 41 | 22 |
+| **Total** | **83** | **61** | **22** |
 
 ---
 
-**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #63, #66, #77, #83 fixed)
+**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #63, #66, #69, #77, #83 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)

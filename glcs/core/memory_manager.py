@@ -556,6 +556,29 @@ class MemoryManager:
         except Exception as e:
             raise GLCSMemoryError(f"Failed to clear context: {str(e)} (context_id: {context_id})")
 
+    def clear_all(self) -> int:
+        """
+        Delete all LogicalForms from all contexts in the store.
+
+        Returns:
+            Total number of forms deleted
+
+        Example:
+            >>> deleted = manager.clear_all()
+            >>> print(f"Wiped {deleted} forms from database")
+        """
+        try:
+            count = self.collection.count()
+            if count > 0:
+                # Get all IDs
+                result = self.collection.get(include=[])
+                self.collection.delete(ids=result["ids"])
+                logger.info(f"Cleared all {count} forms from memory store")
+            return count
+
+        except Exception as e:
+            raise GLCSMemoryError(f"Failed to clear all forms: {str(e)}")
+
     def get_context_stats(self, context_id: str) -> Dict:
         """
         Get statistics about a specific context.
