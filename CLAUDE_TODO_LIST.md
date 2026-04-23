@@ -174,7 +174,7 @@ Carried forward from original audit. Tracks which components have been verified.
 | 60 | No CLI entry point | No `[tool.poetry.scripts]` defined. Package has no command-line interface. |
 | 61 | No log rotation | `config/logging.yaml` uses append mode with no rotation. Log files grow unbounded. |
 | 62 | `glcs/hierarchical/` is empty | Empty placeholder subpackage with no modules. Remove or document as future work. |
-| 63 | Advanced API not exported | `glcs/__init__.py:14-15` — `AdvancedGLCS`, `LLMLogicalParser`, etc. are commented out. Users must know internal module paths. |
+| 63 | ~~Advanced API not exported~~ | **FIXED** `glcs/__init__.py` now exports all key advanced components (`AdvancedGLCS`, `LLMLogicalParser`, `LogicalForm`, etc.) with `__getattr__` lazy loading to prevent eager heavy imports. |
 | 64 | Dual config systems | `glcs/config.py` (ConfigLoader) and `glcs/utils/config_manager.py` (load_config) both provide configuration loading. Unclear which to use. |
 | 65 | `.env.template` incomplete | Only documents 3 API keys. Missing: `GROQ_API_KEY`, `OLLAMA_ENDPOINT`, `OLLAMA_MODEL`, `GLCS_DEFAULT_PROVIDER`, `GLCS_TEMPERATURE`, `GLCS_MAX_TOKENS`, and all model override vars. |
 
@@ -182,7 +182,7 @@ Carried forward from original audit. Tracks which components have been verified.
 
 | # | Issue | File | Details |
 |---|-------|------|---------|
-| 66 | Missing `embedding_dim` property | `glcs/core/semantic_encoder.py` | `self.embedding_dim = 768` is set but never exposed as a property. Integration tests expect `encoder.embedding_dim` — 5 test failures trace to this. |
+| 66 | ~~Missing `embedding_dim` property~~ | ~~`glcs/core/semantic_encoder.py`~~ | **FIXED** `embedding_dim` now exposed as a `@property`. Updated all unit tests to use the property instead of hardcoded 768. |
 | 67 | `search_by_entity` missing `context_id` support | `glcs/core/memory_manager.py` | Integration tests call `search_by_entity(name, context_id=...)` but the method signature or behavior does not properly support the `context_id` filter. |
 | 68 | Missing `save_state()`/`load_state()` methods | `glcs/advanced_wrapper.py` | State persistence is implicit via ChromaDB's `persist_directory`. No explicit save/load API. Should be added for clarity and portability. |
 | 69 | Missing `clear_all()` method | `glcs/core/memory_manager.py` | `clear_context(context_id)` exists but no global `clear_all()` to wipe the entire store. Needed for testing and reset scenarios. |
@@ -209,10 +209,10 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 38 | 25 |
-| **Total** | **83** | **58** | **25** |
+| Tier 3: Engineering Quality | 63 | 40 | 23 |
+| **Total** | **83** | **60** | **23** |
 
 ---
 
-**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #77, #83 fixed)
+**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #63, #66, #77, #83 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)
