@@ -72,12 +72,14 @@ def handle_list_contexts(args, glcs: AdvancedGLCS):
 def handle_clear(args, glcs: AdvancedGLCS):
     """Handle the 'clear' command."""
     if args.all:
-        confirm = input("Are you sure you want to clear ALL contexts? (y/N): ")
-        if confirm.lower() == 'y':
-            count = glcs.clear_all()
-            print(f"Cleared all {count} statements from storage.")
-        else:
-            print("Aborted.")
+        if not args.yes:
+            confirm = input("Are you sure you want to clear ALL contexts? (y/N): ")
+            if confirm.lower() != 'y':
+                print("Aborted.")
+                return 0
+        
+        count = glcs.clear_all()
+        print(f"Cleared all {count} statements from storage.")
     elif args.context:
         count = glcs.clear_context(args.context)
         print(f"Cleared {count} statements from context '{args.context}'.")
@@ -126,6 +128,7 @@ def main():
     clear_parser = subparsers.add_parser("clear", help="Clear stored statements")
     clear_parser.add_argument("--context", help="Clear a specific context")
     clear_parser.add_argument("--all", action="store_true", help="Clear all contexts")
+    clear_parser.add_argument("--yes", "-y", action="store_true", help="Skip confirmation prompt")
     
     args = parser.parse_args()
     

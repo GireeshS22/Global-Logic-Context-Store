@@ -87,3 +87,18 @@ def test_cli_search_command(mock_glcs_class, capsys):
     mock_glcs.search_similar.assert_called_with('query text', context_id=None, top_k=3)
     captured = capsys.readouterr()
     assert "Similar statement" in captured.out
+
+@patch('glcs.cli.AdvancedGLCS')
+def test_cli_clear_all_yes(mock_glcs_class, capsys):
+    """Test the 'clear --all --yes' CLI command skips confirmation (#74)."""
+    mock_glcs = mock_glcs_class.return_value
+    mock_glcs.clear_all.return_value = 5
+    
+    # This should NOT call input() and should NOT hang
+    with patch.object(sys, 'argv', ['glcs', 'clear', '--all', '--yes']):
+        code = main()
+        assert code == 0
+    
+    mock_glcs.clear_all.assert_called_once()
+    captured = capsys.readouterr()
+    assert "Cleared all 5 statements from storage." in captured.out
