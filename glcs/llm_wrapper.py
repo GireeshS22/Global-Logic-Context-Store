@@ -19,9 +19,6 @@ from glcs.providers import (
 )
 from glcs.config import get_config
 
-# Load environment variables
-load_dotenv()
-
 
 class GLCSWrapper:
     """Wrapper for LLM APIs with GLCS consistency checking
@@ -64,6 +61,9 @@ class GLCSWrapper:
             # With custom config
             wrapper = GLCSWrapper(provider='anthropic', model='claude-3-opus')
         """
+        # Load environment variables (Moved from import time #80)
+        load_dotenv()
+
         # Load configuration
         self.config = get_config(config_path)
 
@@ -91,8 +91,9 @@ class GLCSWrapper:
         self.memory = SimpleMemory(persist_path=memory_path)
         self.checker = SimpleConsistencyChecker(self.memory)
 
-        # Conversation history
+        # Conversation history (sliding window prevents unbounded growth #79)
         self.history: List[Dict[str, str]] = []
+        self.max_history = int(os.getenv("GLCS_MAX_HISTORY", 50))
 
     def _create_provider(
         self,
@@ -253,6 +254,10 @@ class GLCSWrapper:
 
         # Add original prompt to history — keep history readable for multi-turn display.
         self.history.append({"role": "user", "content": prompt})
+        
+        # Enforce sliding window
+        if len(self.history) > self.max_history:
+            self.history = self.history[-self.max_history:]
 
         # For the actual LLM call, swap the last user message with the augmented
         # version when context is available so the model sees known facts.
@@ -283,6 +288,10 @@ class GLCSWrapper:
 
             # Add to history
             self.history.append({"role": "assistant", "content": response_text})
+            
+            # Enforce sliding window
+            if len(self.history) > self.max_history:
+                self.history = self.history[-self.max_history:]
 
             # Check response consistency
             if check_consistency:

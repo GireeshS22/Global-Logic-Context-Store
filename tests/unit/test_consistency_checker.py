@@ -394,6 +394,64 @@ def test_detect_semantic_redundancy(consistency_checker, encoder, memory_manager
     assert all(v.severity == "LOW" for v in redundancies)
 
 
+def test_same_text_different_polarity_not_redundant(consistency_checker, encoder):
+    """Regression test for #76: same text with diff polarity should NOT be redundant."""
+    form1 = LogicalForm(
+        context_id="test",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="socrates"),
+        predicate=Relation(verb="is"),
+        object=Entity(name="mortal"),
+        polarity=Polarity.POSITIVE,
+        source_text="Socrates is mortal"
+    )
+
+    form2 = LogicalForm(
+        context_id="test",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="socrates"),
+        predicate=Relation(verb="is"),
+        object=Entity(name="mortal"),
+        polarity=Polarity.NEGATIVE,
+        source_text="Socrates is mortal" # Same text, different polarity
+    )
+
+    encoder.add_embeddings_to_forms([form1, form2])
+    
+    violation = consistency_checker._check_redundancy(form1, form2)
+    assert violation is None, "Should NOT be redundant if polarity differs"
+
+
+def test_batch_same_text_different_polarity_not_redundant(consistency_checker, encoder):
+    """Regression test for #76: batch check should ignore diff polarity same text."""
+    form1 = LogicalForm(
+        context_id="test",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="socrates"),
+        predicate=Relation(verb="is"),
+        object=Entity(name="mortal"),
+        polarity=Polarity.POSITIVE,
+        source_text="Socrates is mortal"
+    )
+
+    form2 = LogicalForm(
+        context_id="test",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="socrates"),
+        predicate=Relation(verb="is"),
+        object=Entity(name="mortal"),
+        polarity=Polarity.NEGATIVE,
+        source_text="Socrates is mortal"
+    )
+
+    encoder.add_embeddings_to_forms([form1, form2])
+    
+    violations = consistency_checker._check_redundancies([form1, form2])
+    
+    redundancies = [v for v in violations if "REDUNDANCY" in v.violation_type]
+    assert len(redundancies) == 0, "Batch check should find 0 redundancies when polarity differs"
+
+
 # ============================================================================
 # CONTEXT CONSISTENCY TESTS
 # ============================================================================

@@ -192,11 +192,11 @@ Carried forward from original audit. Tracks which components have been verified.
 | 73 | `process_batch` silently drops failures | `glcs/advanced_wrapper.py:212-217` | Same pattern — failed statements silently dropped. |
 | 74 | `delete_form` silently succeeds when form doesn't exist | `memory_manager.py:292` | ChromaDB's `delete` doesn't error on missing IDs. No way to know if deletion actually happened. |
 | 75 | `update_form` wasteful existence check | `memory_manager.py:243-247` | Fully reconstructs a `LogicalForm` (including numpy array) just to verify the form exists, then throws it away. Should use a lightweight ID check. |
-| 76 | `_check_redundancy` order-of-operations bug | `consistency_checker.py:470-479` | Exact text match with different polarity is flagged as "EXACT_REDUNDANCY" (LOW severity) instead of contradiction. Polarity check only happens on the semantic redundancy path. |
+| 76 | ~~`_check_redundancy` order-of-operations bug~~ | ~~`consistency_checker.py:470-479`~~ | **FIXED** Redundancy checks now explicitly require the same polarity before text or semantic similarity is checked. Added 2 regression tests. |
 | 77 | ~~`_calculate_severity` has dead branches~~ | ~~`consistency_checker.py:565-569`~~ | **FIXED** Removed dead branches for REDUNDANCY and UNIVERSAL_GROUND_CONTRADICTION; these types now have their severity set directly at the violation site. |
 | 78 | Gemini model recreated every call | `glcs/providers/gemini_provider.py:99-103` | Every `generate()` call with a system instruction creates a new `GenerativeModel` instance. Wasteful. |
-| 79 | History unbounded in `llm_wrapper.py` | `glcs/llm_wrapper.py:95,255,280` | Conversation history grows without limit. Only sliced for API calls but list itself never trimmed. Memory leak. |
-| 80 | `load_dotenv()` at import time | `glcs/llm_wrapper.py:23` | Side effect at import. Contaminates test environments. |
+| 79 | ~~History unbounded in `llm_wrapper.py`~~ | ~~`glcs/llm_wrapper.py:95,255,280`~~ | **FIXED** Implemented sliding window for conversation history using `GLCS_MAX_HISTORY` (default 50). Added unit test for history enforcement. |
+| 80 | ~~`load_dotenv()` at import time~~ | ~~`glcs/llm_wrapper.py:23`~~ | **FIXED** Moved `load_dotenv()` from global scope to `GLCSWrapper.__init__` to prevent test environment contamination. |
 | 81 | Logging fallback hides config problems | `glcs/utils/logger.py:126-134` | Missing config file silently falls back to basicConfig. No warning emitted. |
 | 82 | No `__repr__` for LogicalForm | `glcs/core/models.py` | Default Pydantic repr prints the entire 768-float embedding array, making logs unreadable. |
 | 83 | ~~Mutable default in ProviderConfig~~ | ~~`glcs/providers/base.py:18`~~ | **FIXED** Replaced `extra: Dict = None` with `field(default_factory=dict)`. |
@@ -209,10 +209,10 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 41 | 22 |
-| **Total** | **83** | **61** | **22** |
+| Tier 3: Engineering Quality | 63 | 44 | 19 |
+| **Total** | **83** | **64** | **19** |
 
 ---
 
-**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #63, #66, #69, #77, #83 fixed)
+**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #63, #66, #69, #76, #77, #79, #80, #83 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)

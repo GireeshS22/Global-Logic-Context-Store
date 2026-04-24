@@ -593,13 +593,14 @@ class ConsistencyChecker:
         violations: List[Violation] = []
 
         # --- Exact redundancy: O(n) dict grouping ---
-        # Collect all pairs that share identical (normalised) source text.
+        # Collect all pairs that share identical (normalised) source text AND polarity.
         exact_pairs: set = set()
-        by_text: dict = defaultdict(list)
+        by_text_and_pol: dict = defaultdict(list)
         for form in forms:
-            by_text[form.source_text.strip().lower()].append(form)
+            key = (form.source_text.strip().lower(), form.polarity)
+            by_text_and_pol[key].append(form)
 
-        for group in by_text.values():
+        for group in by_text_and_pol.values():
             for i, form1 in enumerate(group):
                 for form2 in group[i + 1:]:
                     exact_pairs.add((form1.form_id, form2.form_id))
@@ -665,6 +666,10 @@ class ConsistencyChecker:
         Returns:
             Violation if redundancy found, None otherwise
         """
+        # Redundancy requires same polarity
+        if form1.polarity != form2.polarity:
+            return None
+
         # Check exact redundancy (identical source text)
         if form1.source_text.strip().lower() == form2.source_text.strip().lower():
             return Violation(
