@@ -202,11 +202,13 @@ class ConsistencyChecker:
         """
         try:
             violations = []
+            scanned_ids = set()
 
             # 1. Check for polarity contradictions (Subject-based search)
             # Polarity contradictions MUST share the same subject.
             subject_forms = self.memory.search_by_entity(form.subject.name, context_id=context_id)
             for existing in subject_forms:
+                scanned_ids.add(str(existing.form_id))
                 violation = self._check_polarity_contradiction(form, existing)
                 if violation:
                     violations.append(violation)
@@ -218,6 +220,7 @@ class ConsistencyChecker:
                 # OR fact.subject.entity_type == rule.subject.name.
                 # We reuse subject_forms (facts where this name is subject/object).
                 for existing in subject_forms:
+                    # scanned_ids already handled above for subject_forms
                     violation = self._check_universal_ground_contradiction(form, existing)
                     if violation:
                         violations.append(violation)
@@ -235,6 +238,7 @@ class ConsistencyChecker:
                 existing_forms = self.memory.get_forms_by_context(context_id)
                 for existing in existing_forms:
                     if existing.logical_type == LogicalType.UNIVERSAL_RULE:
+                        scanned_ids.add(str(existing.form_id))
                         violation = self._check_universal_ground_contradiction(form, existing)
                         if violation:
                             violations.append(violation)
@@ -248,6 +252,7 @@ class ConsistencyChecker:
                     context_id=context_id
                 )
                 for existing in similar_forms:
+                    scanned_ids.add(str(existing.form_id))
                     violation = self._check_redundancy(form, existing)
                     if violation:
                         violations.append(violation)
@@ -255,7 +260,7 @@ class ConsistencyChecker:
             report = ConsistencyReport(
                 context_id=context_id,
                 violations=violations,
-                total_forms_checked=len(violations) # Note: true total unknown without full scan
+                total_forms_checked=len(scanned_ids)
             )
 
             return report
