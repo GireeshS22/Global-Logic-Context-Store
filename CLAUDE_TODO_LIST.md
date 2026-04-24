@@ -191,7 +191,7 @@ Carried forward from original audit. Tracks which components have been verified.
 | 72 | ~~`parse_batch` silently drops failures~~ | ~~`glcs/core/logical_parser.py:479-485`~~ | **FIXED** Now returns a `BatchResult` object containing both successful `LogicalForm`s and a list of `BatchError`s with full error details. Updated API and unit tests. |
 | 73 | ~~`process_batch` silently drops failures~~ | ~~`glcs/advanced_wrapper.py:212-217`~~ | **FIXED** Now returns a `BatchResult` object containing both successful `ConsistencyReport`s and error details for transparent batch processing. Updated demo examples. |
 | 74 | ~~`delete_form` silently succeeds when form doesn't exist~~ | ~~`memory_manager.py:292`~~ | **FIXED** Added existence check before deletion. `delete_form()` now returns `True` if deleted, `False` if not found. Updated unit tests. |
-| 75 | `update_form` wasteful existence check | `memory_manager.py:243-247` | Fully reconstructs a `LogicalForm` (including numpy array) just to verify the form exists, then throws it away. Should use a lightweight ID check. |
+| 75 | ~~`update_form` wasteful existence check~~ | ~~`memory_manager.py:243-247`~~ | **FIXED** Replaced expensive `retrieve_form()` with a lightweight `collection.get(include=[])` ID-only check to avoid full object reconstruction. |
 | 76 | ~~`_check_redundancy` order-of-operations bug~~ | ~~`consistency_checker.py:470-479`~~ | **FIXED** Redundancy checks now explicitly require the same polarity before text or semantic similarity is checked. Added 2 regression tests. |
 | 77 | ~~`_calculate_severity` has dead branches~~ | ~~`consistency_checker.py:565-569`~~ | **FIXED** Removed dead branches for REDUNDANCY and UNIVERSAL_GROUND_CONTRADICTION; these types now have their severity set directly at the violation site. |
 | 78 | ~~Gemini model recreated every call~~ | ~~`glcs/providers/gemini_provider.py:99-103`~~ | **FIXED** Implemented caching for `GenerativeModel` instances with system instructions. Re-uses instances when instruction matches. Added unit test. |
@@ -209,10 +209,11 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 54 | 9 |
-| **Total** | **83** | **74** | **9** |
+| Tier 3: Engineering Quality | 63 | 55 | 8 |
+| **Total** | **83** | **75** | **8** |
 
 ---
 
-**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #60, #61, #63, #66, #67, #69–#74, #76–#80, #82, #83 fixed)
+**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #60, #61, #63, #66, #67, #69–#80, #82, #83 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)
+

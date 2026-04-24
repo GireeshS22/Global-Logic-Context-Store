@@ -229,11 +229,15 @@ class MemoryManager:
             >>> form.confidence_score = 0.95
             >>> manager.update_form(form_id, form)
         """
-        # Check if form exists
+        # Check if form exists (#75: lightweight check)
         try:
-            self.retrieve_form(form_id)
+            result = self.collection.get(ids=[str(form_id)], include=[])
+            if not result["ids"]:
+                raise GLCSMemoryError(f"Cannot update non-existent form: {form_id}")
         except GLCSMemoryError:
-            raise GLCSMemoryError(f"Cannot update non-existent form: {form_id} (form_id: {form_id})")
+            raise
+        except Exception as e:
+            raise GLCSMemoryError(f"Failed to check form existence: {e}")
 
         if form.embedding is None:
             raise GLCSMemoryError(f"Cannot update form without embedding. (form_id: {form_id})")
