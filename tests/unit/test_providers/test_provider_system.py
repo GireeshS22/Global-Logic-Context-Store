@@ -244,6 +244,37 @@ class TestGeminiProvider:
         except (ImportError, ProviderError):
             pytest.skip("Google Generative AI not installed")
 
+    def test_gemini_cache_eviction(self):
+        """Test that Gemini provider evicts oldest entry when cache limit reached."""
+        try:
+            from glcs.providers.gemini_provider import GeminiProvider
+            with patch('google.generativeai.GenerativeModel') as mock_model_class:
+                mock_model_instance = mock_model_class.return_value
+                mock_model_instance.generate_content.return_value = MagicMock(text="Response")
+                
+                config = ProviderConfig(api_key="test-key", model="gemini-1.5-flash")
+                provider = GeminiProvider(config)
+                
+                # Fill cache to limit (10 entries)
+                for i in range(10):
+                    messages = [{"role": "system", "content": f"Prompt {i}"}, {"role": "user", "content": "Hi"}]
+                    provider.generate(messages)
+                
+                assert len(provider._model_cache) == 10
+                assert "Prompt 0" in provider._model_cache
+                
+                # Add 11th entry - should evict Prompt 0
+                messages = [{"role": "system", "content": "Prompt 10"}, {"role": "user", "content": "Hi"}]
+                provider.generate(messages)
+                
+                assert len(provider._model_cache) == 10
+                assert "Prompt 0" not in provider._model_cache
+                assert "Prompt 10" in provider._model_cache
+                assert "Prompt 1" in provider._model_cache
+                
+        except (ImportError, ProviderError):
+            pytest.skip("Google Generative AI not installed")
+
 
 @pytest.mark.requires_api_key
 class TestGroqProvider:
