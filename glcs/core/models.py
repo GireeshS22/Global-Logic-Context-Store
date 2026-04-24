@@ -230,6 +230,20 @@ class LogicalForm(BaseModel):
         validate_assignment=True  # Run validators on field assignment
     )
 
+    def __repr__(self) -> str:
+        """Custom repr to hide massive embedding array in logs."""
+        emb_str = f"np.ndarray(shape={self.embedding.shape})" if self.embedding is not None else "None"
+        return (
+            f"LogicalForm(form_id={self.form_id}, context_id='{self.context_id}', "
+            f"type={self.logical_type.value}, subject='{self.subject.name}', "
+            f"predicate='{self.predicate.verb}', object='{self.object.name if self.object else None}', "
+            f"polarity={self.polarity.value}, embedding={emb_str})"
+        )
+
+    def __str__(self) -> str:
+        """Friendly string representation."""
+        return f"[{self.logical_type.value.upper()}] {self.source_text} ({self.polarity.value})"
+
     @field_validator('embedding', mode='before')
     @classmethod
     def coerce_and_validate_embedding(cls, v: Any) -> Optional[np.ndarray]:
