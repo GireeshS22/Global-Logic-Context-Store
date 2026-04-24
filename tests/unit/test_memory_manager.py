@@ -722,3 +722,28 @@ def test_round_trip_preserves_entity_metadata(memory_manager, encoder):
 
     assert retrieved.subject.metadata == {"era": "ancient", "born": -384}
     assert retrieved.object.metadata == {"role": "teacher"}
+
+def test_save_load_state(memory_manager, encoder, sample_logical_forms, tmp_path):
+    """Test saving and loading the entire memory store state."""
+    # Populate store
+    for form in sample_logical_forms:
+        encoder.add_embedding_to_form(form)
+        memory_manager.store_form(form)
+    
+    assert memory_manager.count_all_forms() == 3
+    
+    # Save state
+    backup_file = str(tmp_path / "backup.json")
+    save_count = memory_manager.save_state(backup_file)
+    assert save_count == 3
+    
+    # Clear and load
+    load_count = memory_manager.load_state(backup_file, clear_existing=True)
+    assert load_count == 3
+    assert memory_manager.count_all_forms() == 3
+    
+    # Verify content
+    for form in sample_logical_forms:
+        retrieved = memory_manager.retrieve_form(form.form_id)
+        assert retrieved.source_text == form.source_text
+        assert retrieved.context_id == form.context_id

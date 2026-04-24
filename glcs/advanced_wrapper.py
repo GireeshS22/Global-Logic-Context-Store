@@ -385,6 +385,43 @@ class AdvancedGLCS:
         logger.info(f"Deleted {count} statements in total")
         return count
 
+    def save_state(self, file_path: str) -> int:
+        """
+        Save the entire knowledge base state to a portable JSON file.
+
+        Args:
+            file_path: Destination path for the state file
+
+        Returns:
+            Number of statements saved
+
+        Example:
+            >>> glcs.save_state("glcs_backup.json")
+        """
+        logger.info(f"Saving knowledge base state to: {file_path}")
+        count = self.memory.save_state(file_path)
+        logger.info(f"Successfully saved {count} statements")
+        return count
+
+    def load_state(self, file_path: str, clear_existing: bool = True) -> int:
+        """
+        Load knowledge base state from a portable JSON file.
+
+        Args:
+            file_path: Source path of the state file
+            clear_existing: If True, wipes current memory before loading
+
+        Returns:
+            Number of statements loaded
+
+        Example:
+            >>> glcs.load_state("glcs_backup.json")
+        """
+        logger.info(f"Loading knowledge base state from: {file_path}")
+        count = self.memory.load_state(file_path, clear_existing=clear_existing)
+        logger.info(f"Successfully loaded {count} statements")
+        return count
+
     def get_system_info(self) -> Dict[str, Any]:
         """
         Get information about the GLCS system configuration.

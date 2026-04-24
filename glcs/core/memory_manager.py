@@ -595,6 +595,96 @@ class MemoryManager:
         except Exception as e:
             raise GLCSMemoryError(f"Failed to clear all forms: {str(e)}")
 
+    def save_state(self, file_path: str) -> int:
+        """
+        Export all stored LogicalForms to a JSON file for portability.
+
+        Args:
+            file_path: Path to the destination JSON file
+
+        Returns:
+            Number of forms exported
+
+        Example:
+            >>> manager.save_state("backup.json")
+        """
+        import json
+        from glcs.utils.config_manager import DateTimeEncoder
+
+        try:
+            # Get all data including embeddings
+            result = self.collection.get(include=["embeddings", "metadatas", "documents"])
+            
+            forms_data = []
+            for form_id, embedding, metadata, document in zip(
+                result["ids"],
+                result["embeddings"],
+                result["metadatas"],
+                result["documents"]
+            ):
+                forms_data.append({
+                    "id": form_id,
+                    "embedding": embedding,
+                    "metadata": metadata,
+                    "document": document
+                })
+
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(forms_data, f, indent=2, cls=DateTimeEncoder)
+
+            count = len(forms_data)
+            logger.info(f"Saved {count} forms to {file_path}")
+            return count
+
+        except Exception as e:
+            raise GLCSMemoryError(f"Failed to save state to {file_path}: {e}")
+
+    def load_state(self, file_path: str, clear_existing: bool = True) -> int:
+        """
+        Import LogicalForms from a JSON file.
+
+        Args:
+            file_path: Path to the source JSON file
+            clear_existing: If True, wipes the current store before importing
+
+        Returns:
+            Number of forms imported
+
+        Example:
+            >>> manager.load_state("backup.json")
+        """
+        import json
+
+        try:
+            if clear_existing:
+                self.clear_all()
+
+            with open(file_path, 'r', encoding='utf-8') as f:
+                forms_data = json.load(f)
+
+            if not forms_data:
+                return 0
+
+            # Extract into batch format for ChromaDB
+            ids = [f["id"] for f in forms_data]
+            embeddings = [f["embedding"] for f in forms_data]
+            metadatas = [f["metadata"] for f in forms_data]
+            documents = [f["document"] for f in forms_data]
+
+            self.collection.add(
+                ids=ids,
+                embeddings=embeddings,
+                metadatas=metadatas,
+                documents=documents
+            )
+
+            count = len(forms_data)
+            logger.info(f"Loaded {count} forms from {file_path}")
+            return count
+
+        except Exception as e:
+            raise GLCSMemoryError(f"Failed to load state from {file_path}: {e}")
+
     def get_context_stats(self, context_id: str) -> Dict:
         """
         Get statistics about a specific context.

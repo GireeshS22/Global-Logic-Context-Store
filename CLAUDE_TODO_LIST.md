@@ -184,7 +184,7 @@ Carried forward from original audit. Tracks which components have been verified.
 |---|-------|------|---------|
 | 66 | ~~Missing `embedding_dim` property~~ | ~~`glcs/core/semantic_encoder.py`~~ | **FIXED** `embedding_dim` now exposed as a `@property`. Updated all unit tests to use the property instead of hardcoded 768. |
 | 67 | ~~`search_by_entity` missing `context_id` support~~ | ~~`glcs/core/memory_manager.py`~~ | **FIXED** Method already supported `context_id`. Added unit test verification to ensure filtering works correctly across contexts. |
-| 68 | Missing `save_state()`/`load_state()` methods | `glcs/advanced_wrapper.py` | State persistence is implicit via ChromaDB's `persist_directory`. No explicit save/load API. Should be added for clarity and portability. |
+| 68 | ~~Missing `save_state()`/`load_state()` methods~~ | ~~`glcs/advanced_wrapper.py`~~ | **FIXED** Implemented explicit JSON-based state export/import in `MemoryManager` and exposed via `AdvancedGLCS`. Ensures portability across environments. Added unit test. |
 | 69 | ~~Missing `clear_all()` method~~ | ~~`glcs/core/memory_manager.py`~~ | **FIXED** `clear_all()` implemented in `MemoryManager` and exposed via `AdvancedGLCS`. Added 2 unit tests and 1 integration test. |
 | 70 | ~~`switch_provider` half-updates on failure~~ | ~~`glcs/core/logical_parser.py:537-555`~~ | **FIXED** Implemented atomic switching — internal state (`provider_name`, `_model`, etc.) is only updated AFTER successful `ProviderFactory.create()` call. Added regression test. |
 | 71 | ~~`_validate_extraction` mutates input~~ | ~~`glcs/core/logical_parser.py:349-365`~~ | **FIXED** Refactored to a pure function that returns a new validated dictionary with defaults applied. Input dictionary remains untouched. Added unit test. |
@@ -209,11 +209,11 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 55 | 8 |
-| **Total** | **83** | **75** | **8** |
+| Tier 3: Engineering Quality | 63 | 56 | 7 |
+| **Total** | **83** | **76** | **7** |
 
 ---
 
-**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #60, #61, #63, #66, #67, #69–#80, #82, #83 fixed)
+**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #60, #61, #63, #66–#74, #76–#80, #82, #83 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)
 

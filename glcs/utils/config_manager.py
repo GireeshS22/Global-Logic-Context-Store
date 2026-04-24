@@ -44,6 +44,21 @@ VALUE_RANGES = {
 }
 
 
+import json
+from datetime import datetime, date
+import numpy as np
+
+
+class DateTimeEncoder(json.JSONEncoder):
+    """Custom JSON encoder for datetime and numpy objects."""
+    def default(self, obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super().default(obj)
+
+
 def load_config(config_path: str) -> Dict[str, Any]:
     """
     Load configuration from a YAML file.
