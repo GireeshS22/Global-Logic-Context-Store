@@ -201,6 +201,7 @@ Carried forward from original audit. Tracks which components have been verified.
 | 81 | ~~Logging fallback hides config problems~~ | ~~`glcs/utils/logger.py:126-134`~~ | **FIXED** `get_logger()` now emits a clear warning to `stderr` when falling back to default logging due to a missing configuration file. Added unit test. |
 | 82 | ~~No `__repr__` for LogicalForm~~ | ~~`glcs/core/models.py`~~ | **FIXED** Custom `__repr__` implemented for `LogicalForm` that summarizes metadata and hides the massive 768-float embedding array. Added `__str__` for friendly display. |
 | 83 | ~~Mutable default in ProviderConfig~~ | ~~`glcs/providers/base.py:18`~~ | **FIXED** Replaced `extra: Dict = None` with `field(default_factory=dict)`. |
+| 84 | ~~LLM hallucinations for `logical_type`~~ | ~~`glcs/core/logical_parser.py:368-372`~~ | **FIXED** Implemented auto-correction in `_validate_extraction()` to map common hallucinations (e.g., 'negative', 'fact') to valid `LogicalType` values. |
 
 ---
 
@@ -210,12 +211,12 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 63 | 0 |
-| **Total** | **83** | **83** | **0** |
+| Tier 3: Engineering Quality | 64 | 64 | 0 |
+| **Total** | **84** | **84** | **0** |
 
 ---
 
-**Last Updated:** 2026-04-24 (MISSION 100% COMPLETE — 4 Peer Feedbacks Resolved)
+**Last Updated:** 2026-04-24 (MISSION 100% COMPLETE — 5 Peer Feedbacks Resolved)
 **Audited By:** Claude Opus 4.6 (full codebase audit)
 
 
