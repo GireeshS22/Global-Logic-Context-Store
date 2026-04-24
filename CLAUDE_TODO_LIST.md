@@ -172,7 +172,7 @@ Carried forward from original audit. Tracks which components have been verified.
 | 58 | Missing PyPI metadata | No `license`, `classifiers`, `keywords`, `homepage`, `repository` fields in `pyproject.toml`. |
 | 59 | `authors = ["PhD Project"]` | Not in standard `"Name <email>"` format. Will cause issues during PyPI publication. |
 | 60 | ~~No CLI entry point~~ | ~~`glcs/cli.py`~~ | **FIXED** Created full-featured CLI using `argparse` with support for processing, verifying, searching, and clearing contexts. Added entry point to `pyproject.toml`. |
-| 61 | No log rotation | `config/logging.yaml` uses append mode with no rotation. Log files grow unbounded. |
+| 61 | ~~Log rotation missing~~ | ~~`config/logging.yaml`~~ | **FIXED** Updated `file` and `error_file` handlers to use `RotatingFileHandler` with 10MB limit and 5 backups. Added unit test verification. |
 | 62 | `glcs/hierarchical/` is empty | Empty placeholder subpackage with no modules. Remove or document as future work. |
 | 63 | ~~Advanced API not exported~~ | **FIXED** `glcs/__init__.py` now exports all key advanced components (`AdvancedGLCS`, `LLMLogicalParser`, `LogicalForm`, etc.) with `__getattr__` lazy loading to prevent eager heavy imports. |
 | 64 | Dual config systems | `glcs/config.py` (ConfigLoader) and `glcs/utils/config_manager.py` (load_config) both provide configuration loading. Unclear which to use. |
@@ -183,18 +183,18 @@ Carried forward from original audit. Tracks which components have been verified.
 | # | Issue | File | Details |
 |---|-------|------|---------|
 | 66 | ~~Missing `embedding_dim` property~~ | ~~`glcs/core/semantic_encoder.py`~~ | **FIXED** `embedding_dim` now exposed as a `@property`. Updated all unit tests to use the property instead of hardcoded 768. |
-| 67 | `search_by_entity` missing `context_id` support | `glcs/core/memory_manager.py` | Integration tests call `search_by_entity(name, context_id=...)` but the method signature or behavior does not properly support the `context_id` filter. |
+| 67 | ~~`search_by_entity` missing `context_id` support~~ | ~~`glcs/core/memory_manager.py`~~ | **FIXED** Method already supported `context_id`. Added unit test verification to ensure filtering works correctly across contexts. |
 | 68 | Missing `save_state()`/`load_state()` methods | `glcs/advanced_wrapper.py` | State persistence is implicit via ChromaDB's `persist_directory`. No explicit save/load API. Should be added for clarity and portability. |
 | 69 | ~~Missing `clear_all()` method~~ | ~~`glcs/core/memory_manager.py`~~ | **FIXED** `clear_all()` implemented in `MemoryManager` and exposed via `AdvancedGLCS`. Added 2 unit tests and 1 integration test. |
-| 70 | `switch_provider` half-updates on failure | `glcs/core/logical_parser.py:537-555` | Updates `self.provider_name` before `ProviderFactory.create()`. If factory raises, the object is in an inconsistent state (name changed, provider unchanged). |
-| 71 | `_validate_extraction` mutates input | `glcs/core/logical_parser.py:349-365` | A method named "validate" silently mutates the input dict by inserting defaults. Violates single responsibility. |
-| 72 | `parse_batch` silently drops failures | `glcs/core/logical_parser.py:479-485` | Failed items logged as warning but dropped. Caller gets a shorter list with no indication which items failed. |
-| 73 | `process_batch` silently drops failures | `glcs/advanced_wrapper.py:212-217` | Same pattern — failed statements silently dropped. |
-| 74 | `delete_form` silently succeeds when form doesn't exist | `memory_manager.py:292` | ChromaDB's `delete` doesn't error on missing IDs. No way to know if deletion actually happened. |
+| 70 | ~~`switch_provider` half-updates on failure~~ | ~~`glcs/core/logical_parser.py:537-555`~~ | **FIXED** Implemented atomic switching — internal state (`provider_name`, `_model`, etc.) is only updated AFTER successful `ProviderFactory.create()` call. Added regression test. |
+| 71 | ~~`_validate_extraction` mutates input~~ | ~~`glcs/core/logical_parser.py:349-365`~~ | **FIXED** Refactored to a pure function that returns a new validated dictionary with defaults applied. Input dictionary remains untouched. Added unit test. |
+| 72 | ~~`parse_batch` silently drops failures~~ | ~~`glcs/core/logical_parser.py:479-485`~~ | **FIXED** Now returns a `BatchResult` object containing both successful `LogicalForm`s and a list of `BatchError`s with full error details. Updated API and unit tests. |
+| 73 | ~~`process_batch` silently drops failures~~ | ~~`glcs/advanced_wrapper.py:212-217`~~ | **FIXED** Now returns a `BatchResult` object containing both successful `ConsistencyReport`s and error details for transparent batch processing. Updated demo examples. |
+| 74 | ~~`delete_form` silently succeeds when form doesn't exist~~ | ~~`memory_manager.py:292`~~ | **FIXED** Added existence check before deletion. `delete_form()` now returns `True` if deleted, `False` if not found. Updated unit tests. |
 | 75 | `update_form` wasteful existence check | `memory_manager.py:243-247` | Fully reconstructs a `LogicalForm` (including numpy array) just to verify the form exists, then throws it away. Should use a lightweight ID check. |
 | 76 | ~~`_check_redundancy` order-of-operations bug~~ | ~~`consistency_checker.py:470-479`~~ | **FIXED** Redundancy checks now explicitly require the same polarity before text or semantic similarity is checked. Added 2 regression tests. |
 | 77 | ~~`_calculate_severity` has dead branches~~ | ~~`consistency_checker.py:565-569`~~ | **FIXED** Removed dead branches for REDUNDANCY and UNIVERSAL_GROUND_CONTRADICTION; these types now have their severity set directly at the violation site. |
-| 78 | Gemini model recreated every call | `glcs/providers/gemini_provider.py:99-103` | Every `generate()` call with a system instruction creates a new `GenerativeModel` instance. Wasteful. |
+| 78 | ~~Gemini model recreated every call~~ | ~~`glcs/providers/gemini_provider.py:99-103`~~ | **FIXED** Implemented caching for `GenerativeModel` instances with system instructions. Re-uses instances when instruction matches. Added unit test. |
 | 79 | ~~History unbounded in `llm_wrapper.py`~~ | ~~`glcs/llm_wrapper.py:95,255,280`~~ | **FIXED** Implemented sliding window for conversation history using `GLCS_MAX_HISTORY` (default 50). Added unit test for history enforcement. |
 | 80 | ~~`load_dotenv()` at import time~~ | ~~`glcs/llm_wrapper.py:23`~~ | **FIXED** Moved `load_dotenv()` from global scope to `GLCSWrapper.__init__` to prevent test environment contamination. |
 | 81 | Logging fallback hides config problems | `glcs/utils/logger.py:126-134` | Missing config file silently falls back to basicConfig. No warning emitted. |
@@ -209,10 +209,10 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 46 | 17 |
-| **Total** | **83** | **66** | **17** |
+| Tier 3: Engineering Quality | 63 | 54 | 9 |
+| **Total** | **83** | **74** | **9** |
 
 ---
 
-**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #60, #63, #66, #69, #76, #77, #79, #80, #82, #83 fixed)
+**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #60, #61, #63, #66, #67, #69–#74, #76–#80, #82, #83 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)

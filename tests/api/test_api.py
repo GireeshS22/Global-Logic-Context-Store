@@ -139,14 +139,18 @@ def test_batch_parse(api_client):
     assert response.status_code == 200
     data = response.json()
 
-    # Should return list of parsed forms
-    assert isinstance(data, list)
-    assert len(data) == 3
+    # Should return BatchParseResponse object
+    assert isinstance(data, dict)
+    assert "forms" in data
+    assert len(data["forms"]) == 3
+    assert data["success_count"] == 3
+    assert data["total_count"] == 3
+    assert data["all_successful"] is True
 
     # Check first result
-    assert data[0]["source_text"] == "Charlie is a designer"
-    assert "subject" in data[0]
-    assert "predicate" in data[0]
+    assert data["forms"][0]["source_text"] == "Charlie is a designer"
+    assert "subject" in data["forms"][0]
+    assert "predicate" in data["forms"][0]
 
 
 def test_batch_parse_empty_list(api_client):

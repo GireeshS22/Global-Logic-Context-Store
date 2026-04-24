@@ -349,3 +349,34 @@ class ConsistencyReport(BaseModel):
     def is_consistent(self) -> bool:
         """True iff no violations were detected. Auto-derived — never pass manually."""
         return len(self.violations) == 0
+
+
+class BatchResult(BaseModel):
+    """
+    Generic container for batch operation results (#72, #73).
+    
+    Tracks successful items and failures separately to ensure transparency.
+    
+    Attributes:
+        successes: List of successfully processed items
+        errors: List of dicts with 'index', 'text', and 'error' keys
+        total_count: Total number of items in the batch
+    """
+    successes: List[Any] = Field(default_factory=list)
+    errors: List[Dict[str, Any]] = Field(default_factory=list)
+    total_count: int = 0
+
+    @computed_field
+    @property
+    def success_count(self) -> int:
+        return len(self.successes)
+
+    @computed_field
+    @property
+    def error_count(self) -> int:
+        return len(self.errors)
+
+    @computed_field
+    @property
+    def all_successful(self) -> bool:
+        return len(self.errors) == 0

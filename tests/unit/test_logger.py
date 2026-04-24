@@ -13,6 +13,7 @@ Version: 0.1.0
 
 import pytest
 import logging
+from logging.handlers import RotatingFileHandler
 import tempfile
 from pathlib import Path
 
@@ -133,3 +134,19 @@ def test_logger_name_hierarchy():
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+def test_log_rotation_config():
+    """Test that log rotation is correctly configured."""
+    reset_logging()
+    setup_logging("config/logging.yaml")
+    
+    # Check glcs logger handlers
+    logger = logging.getLogger("glcs")
+    rotating_handlers = [h for h in logger.handlers if isinstance(h, RotatingFileHandler)]
+    
+    # We expect 2: 'file' and 'error_file'
+    assert len(rotating_handlers) == 2
+    
+    for handler in rotating_handlers:
+        assert handler.maxBytes == 10485760
+        assert handler.backupCount == 5

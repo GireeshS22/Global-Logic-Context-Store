@@ -211,6 +211,39 @@ class TestGeminiProvider:
         except (ImportError, ProviderError):
             pytest.skip("Google Generative AI not installed")
 
+    def test_gemini_model_caching(self):
+        """Test that Gemini provider caches model instances (#78)"""
+        try:
+            from glcs.providers.gemini_provider import GeminiProvider
+            with patch('google.generativeai.GenerativeModel') as mock_model_class:
+                mock_model_instance = mock_model_class.return_value
+                mock_model_instance.generate_content.return_value = MagicMock(text="Response")
+                
+                config = ProviderConfig(api_key="test-key", model="gemini-1.5-flash")
+                provider = GeminiProvider(config)
+                
+                messages = [
+                    {"role": "system", "content": "You are a helpful assistant"},
+                    {"role": "user", "content": "Hello"}
+                ]
+                
+                # First call
+                provider.generate(messages)
+                # Second call with same system instruction
+                provider.generate(messages)
+                
+                # Should have created the system-instruction model exactly once
+                # (Plus once in __init__ for the base client)
+                assert mock_model_class.call_count == 2
+                
+                # Third call with different instruction
+                messages2 = [{"role": "system", "content": "New prompt"}, {"role": "user", "content": "Hi"}]
+                provider.generate(messages2)
+                assert mock_model_class.call_count == 3
+                
+        except (ImportError, ProviderError):
+            pytest.skip("Google Generative AI not installed")
+
 
 @pytest.mark.requires_api_key
 class TestGroqProvider:

@@ -254,22 +254,34 @@ class MemoryManager:
         except Exception as e:
             raise GLCSMemoryError(f"Failed to update form: {str(e)} (form_id: {form_id})")
 
-    def delete_form(self, form_id: UUID) -> None:
+    def delete_form(self, form_id: UUID) -> bool:
         """
         Delete a LogicalForm from storage.
 
         Args:
             form_id: UUID of the form to delete
 
+        Returns:
+            True if deleted, False if form was not found (#74)
+
         Raises:
             GLCSMemoryError: If deletion fails
 
         Example:
-            >>> manager.delete_form(form_id)
+            >>> deleted = manager.delete_form(form_id)
+            >>> if deleted:
+            ...     print("Deleted successfully")
         """
         try:
+            # Check if it exists first because ChromaDB.delete is silent (#74)
+            result = self.collection.get(ids=[str(form_id)], include=[])
+            if not result["ids"]:
+                logger.debug(f"Form {form_id} not found for deletion")
+                return False
+
             self.collection.delete(ids=[str(form_id)])
             logger.debug(f"Deleted form {form_id}")
+            return True
 
         except Exception as e:
             raise GLCSMemoryError(f"Failed to delete form: {str(e)} (form_id: {form_id})")

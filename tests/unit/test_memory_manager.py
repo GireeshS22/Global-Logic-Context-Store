@@ -190,14 +190,19 @@ def test_delete_form(memory_manager, encoder, sample_logical_form):
 
     assert memory_manager.count_all_forms() == 1
 
-    # Delete form
-    memory_manager.delete_form(form_id)
+    # Delete form (#74: check return value)
+    deleted = memory_manager.delete_form(form_id)
+    assert deleted is True
 
     assert memory_manager.count_all_forms() == 0
 
     # Verify it's gone
     with pytest.raises(GLCSMemoryError, match="Form not found"):
         memory_manager.retrieve_form(form_id)
+
+    # Delete non-existent form (#74)
+    deleted_again = memory_manager.delete_form(form_id)
+    assert deleted_again is False
 
 
 # ============================================================================
@@ -285,6 +290,28 @@ def test_search_by_entity(memory_manager, encoder, sample_logical_forms):
 
     assert len(socrates_forms) == 2  # 2 forms mention Socrates
     assert all("socrates" in form.source_text.lower() for form in socrates_forms)
+
+
+def test_search_by_entity_with_context_filter(memory_manager, encoder, sample_logical_forms):
+    """Test searching by entity name with context_id filter."""
+    # Store forms across different contexts
+    for form in sample_logical_forms:
+        encoder.add_embedding_to_form(form)
+        memory_manager.store_form(form)
+
+    # Search for "socrates" in session_1
+    socrates_ctx1 = memory_manager.search_by_entity("socrates", context_id="session_1")
+    assert len(socrates_ctx1) == 1
+    assert socrates_ctx1[0].context_id == "session_1"
+
+    # Search for "socrates" in session_2
+    socrates_ctx2 = memory_manager.search_by_entity("socrates", context_id="session_2")
+    assert len(socrates_ctx2) == 1
+    assert socrates_ctx2[0].context_id == "session_2"
+    
+    # Search for non-existent pair
+    none_ctx3 = memory_manager.search_by_entity("socrates", context_id="session_3")
+    assert len(none_ctx3) == 0
 
 
 def test_search_by_entity_no_results(memory_manager, encoder, sample_logical_forms):

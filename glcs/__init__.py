@@ -15,7 +15,7 @@ if TYPE_CHECKING:
     from glcs.core import (
         LLMLogicalParser, LogicalForm, SemanticEncoder, MemoryManager,
         ConsistencyChecker, Entity, Relation, LogicalType, Polarity,
-        ViolationType, Severity, Violation, ConsistencyReport
+        ViolationType, Severity, Violation, ConsistencyReport, BatchResult
     )
 
 __version__ = "0.1.0"
@@ -35,6 +35,7 @@ _ADVANCED_EXPORTS = {
     'Severity': 'glcs.core',
     'Violation': 'glcs.core',
     'ConsistencyReport': 'glcs.core',
+    'BatchResult': 'glcs.core',
 }
 
 def __getattr__(name: str):
@@ -73,4 +74,5 @@ __all__ = [
     "Severity",
     "Violation",
     "ConsistencyReport",
+    "BatchResult",
 ]

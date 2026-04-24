@@ -53,6 +53,8 @@ class GeminiProvider(LLMProvider):
             genai.configure(api_key=self.config.api_key)
             self._genai = genai
             self._client = genai.GenerativeModel(self.config.model)
+            # Cache for models with specific system instructions (#78)
+            self._model_cache: Dict[str, Any] = {}
         except ImportError:
             raise ProviderError(
                 "Google Generative AI package not installed. "
@@ -83,13 +85,18 @@ class GeminiProvider(LLMProvider):
             if 'top_k' in kwargs:
                 generation_config['top_k'] = kwargs['top_k']
 
-            # Recreate model only when a system instruction is present (#78 partially —
-            # avoids unnecessary recreation on the common no-system-instruction path)
+            # Use cached model if system instruction matches (#78)
             if system_instruction:
-                model = self._genai.GenerativeModel(
-                    self.config.model,
-                    system_instruction=system_instruction
-                )
+                if system_instruction not in self._model_cache:
+                    # Basic cache cleanup if it grows too large
+                    if len(self._model_cache) >= 10:
+                        self._model_cache.clear()
+                    
+                    self._model_cache[system_instruction] = self._genai.GenerativeModel(
+                        self.config.model,
+                        system_instruction=system_instruction
+                    )
+                model = self._model_cache[system_instruction]
             else:
                 model = self._client
 

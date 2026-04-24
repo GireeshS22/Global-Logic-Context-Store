@@ -192,7 +192,7 @@ class AdvancedGLCS:
         texts: List[str],
         context_id: str,
         auto_store: bool = True,
-    ) -> List[ConsistencyReport]:
+    ) -> "BatchResult":
         """
         Process multiple statements efficiently.
 
@@ -202,22 +202,35 @@ class AdvancedGLCS:
             auto_store: If True, store consistent statements
 
         Returns:
-            List of ConsistencyReport objects
+            BatchResult containing reports for successful items and error details (#73)
         """
+        # (#73: Full transparency — track successes and errors separately)
+        from glcs.core.models import BatchResult
+        
         logger.info(f"Processing batch of {len(texts)} statements")
-        reports = []
+        successes = []
+        errors = []
 
-        for i, text in enumerate(texts, 1):
-            logger.debug(f"Processing {i}/{len(texts)}")
+        for i, text in enumerate(texts):
+            logger.debug(f"Processing item {i+1}/{len(texts)}")
             try:
                 report = self.process_statement(text, context_id, auto_store)
-                reports.append(report)
+                successes.append(report)
             except Exception as e:
-                logger.warning(f"Failed to process statement {i}: {e}")
-                continue
+                logger.warning(f"Failed to process statement {i} ('{text[:30]}...'): {e}")
+                errors.append({
+                    'index': i,
+                    'text': text,
+                    'error': str(e)
+                })
 
-        logger.info(f"Batch processing complete: {len(reports)}/{len(texts)} successful")
-        return reports
+        logger.info(f"Batch processing complete: {len(successes)}/{len(texts)} successful")
+        
+        return BatchResult(
+            successes=successes,
+            errors=errors,
+            total_count=len(texts)
+        )
 
     def verify_context(self, context_id: str) -> ConsistencyReport:
         """

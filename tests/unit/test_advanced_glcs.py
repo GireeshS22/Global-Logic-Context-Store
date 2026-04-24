@@ -100,10 +100,12 @@ class TestFullPipeline:
             "Charlie is an employee"
         ]
 
-        reports = advanced_glcs.process_batch(statements, "test-ctx-3")
+        result = advanced_glcs.process_batch(statements, "test-ctx-3")
 
-        assert len(reports) == 3
-        assert all(r.is_consistent for r in reports)
+        assert result.success_count == 3
+        assert result.total_count == 3
+        assert result.all_successful is True
+        assert all(r.is_consistent for r in result.successes)
 
         # Verify all stored
         forms = advanced_glcs.memory.get_forms_by_context("test-ctx-3")

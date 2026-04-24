@@ -16,6 +16,7 @@ Tests cover:
 
 import pytest
 import json
+import copy
 from unittest.mock import Mock, patch, MagicMock
 from datetime import datetime
 
@@ -312,17 +313,41 @@ class TestValidation:
             })
 
     def test_validate_invalid_subject_structure(self):
-        """Test validation fails on invalid subject structure."""
+        """Test validation fails if subject structure is invalid."""
         parser = LLMLogicalParser()
 
-        with pytest.raises(ValidationError, match="Invalid subject"):
+        with pytest.raises(ValidationError, match="Invalid subject structure"):
             parser._validate_extraction({
-                'subject': 'not_a_dict',  # Should be dict
+                'subject': "not a dict",
                 'predicate': {'verb': 'is'},
                 'logical_type': 'ground_fact',
                 'polarity': 'positive',
                 'confidence': 0.9
             })
+
+    def test_validate_extraction_is_pure(self):
+        """Test that _validate_extraction does not mutate input dict (#71)."""
+        parser = LLMLogicalParser()
+
+        # Minimal input that needs defaults
+        input_data = {
+            'subject': {'name': 'test'},
+            'predicate': {'verb': 'is'}
+        }
+
+        input_copy = copy.deepcopy(input_data)
+
+        validated = parser._validate_extraction(input_data)
+
+        # Original should be untouched
+        assert input_data == input_copy
+
+        # New dict should have defaults
+        assert 'logical_type' in validated
+        assert 'polarity' in validated
+        assert 'confidence' in validated
+        assert validated['confidence'] == 0.7
+
 
 
 class TestErrorHandling:
@@ -475,10 +500,12 @@ class TestBatchProcessing:
 
         parser = LLMLogicalParser()
         texts = ["Statement 1", "Statement 2", "Statement 3"]
-        forms = parser.parse_batch(texts, "ctx-123")
+        result = parser.parse_batch(texts, "ctx-123")
 
-        assert len(forms) == 3
-        for form in forms:
+        assert result.success_count == 3
+        assert result.total_count == 3
+        assert result.all_successful is True
+        for form in result.successes:
             assert form.context_id == "ctx-123"
 
     @patch('glcs.core.logical_parser.LLMLogicalParser._call_llm')
@@ -495,10 +522,14 @@ class TestBatchProcessing:
 
         parser = LLMLogicalParser(max_retries=1)
         texts = ["Statement 1", "Statement 2", "Statement 3"]
-        forms = parser.parse_batch(texts, "ctx-123")
+        result = parser.parse_batch(texts, "ctx-123")
 
         # Should get 2 out of 3
-        assert len(forms) == 2
+        assert result.success_count == 2
+        assert result.total_count == 3
+        assert result.error_count == 1
+        assert result.all_successful is False
+        assert result.errors[0]['index'] == 1
 
 
 class TestProviderSwitching:
@@ -528,6 +559,26 @@ class TestProviderSwitching:
         parser.switch_provider('openai')
 
         assert len(parser.cache) == 0
+
+    @patch('glcs.core.logical_parser.ProviderFactory.create')
+    def test_switch_provider_atomic_failure(self, mock_factory):
+        """Test that failure to create new provider leaves parser unchanged (#70)."""
+        mock_provider = Mock()
+        # First call (init) succeeds, second call (switch) fails
+        mock_factory.side_effect = [mock_provider, Exception("Failed to create provider")]
+
+        parser = LLMLogicalParser(provider='ollama', model='old-model')
+        assert parser.provider_name == 'ollama'
+        assert parser._model == 'old-model'
+
+        # Switch should fail
+        with pytest.raises(Exception, match="Failed to create provider"):
+            parser.switch_provider('openai', model='new-model')
+
+        # State should still be original
+        assert parser.provider_name == 'ollama'
+        assert parser._model == 'old-model'
+        assert parser.provider == mock_provider
 
 
 class TestIntegrationWithLogicalForm:

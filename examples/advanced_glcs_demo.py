@@ -209,14 +209,17 @@ def demo_batch_processing():
     for stmt in statements:
         print(f"   • {stmt}")
 
-    reports = glcs.process_batch(statements, context_id="hr-db")
+    result = glcs.process_batch(statements, context_id="hr-db")
 
-    print(f"\n✓ Processed: {len(reports)}/{len(statements)}")
+    print(f"\n✓ Processed: {result.success_count}/{result.total_count}")
 
     # Count consistent vs inconsistent
-    consistent_count = sum(1 for r in reports if r.is_consistent)
+    consistent_count = sum(1 for r in result.successes if r.is_consistent)
     print(f"   ✅ Consistent: {consistent_count}")
-    print(f"   ❌ Inconsistent: {len(reports) - consistent_count}")
+    print(f"   ❌ Inconsistent: {result.success_count - consistent_count}")
+    
+    if not result.all_successful:
+        print(f"   ⚠️  Errors: {result.error_count}")
 
 
 def demo_system_info():

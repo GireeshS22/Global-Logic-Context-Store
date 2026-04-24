@@ -254,10 +254,10 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
         for attempt in range(self.max_retries):
             try:
                 # Call LLM
-                extracted_data = self._call_llm(text)
+                raw_data = self._call_llm(text)
 
-                # Validate extracted data
-                self._validate_extraction(extracted_data)
+                # Validate extracted data (returns a pure copy with defaults #71)
+                extracted_data = self._validate_extraction(raw_data)
 
                 # Create LogicalForm
                 form = self._create_logical_form(
@@ -341,69 +341,77 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
         except Exception as e:
             raise ParsingError(f"LLM call failed: {e}")
 
-    def _validate_extraction(self, data: Dict[str, Any]) -> None:
+    def _validate_extraction(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Validate extracted data structure and values.
 
         Args:
             data: Extracted data dictionary from LLM
 
+        Returns:
+            Validated data dictionary (new instance with defaults applied)
+
         Raises:
             ValidationError: If data is invalid or incomplete
         """
+        # (#71: Pure function — return new dict instead of mutating input)
+        validated = copy.deepcopy(data)
+
         # Check essential fields first (subject and predicate are truly required)
-        if 'subject' not in data:
+        if 'subject' not in validated:
             raise ValidationError(f"Missing required field: subject")
-        if 'predicate' not in data:
+        if 'predicate' not in validated:
             raise ValidationError(f"Missing required field: predicate")
 
         # Add intelligent defaults for missing optional fields
         # This helps with smaller models that may not always include all fields
-        if 'logical_type' not in data:
+        if 'logical_type' not in validated:
             # Infer logical type from statement structure
-            if data.get('object') is None:
-                data['logical_type'] = 'ground_fact'  # Simple assertion
+            if validated.get('object') is None:
+                validated['logical_type'] = 'ground_fact'  # Simple assertion
             else:
-                data['logical_type'] = 'ground_fact'  # Default to ground fact
-            logger.debug(f"Inferred logical_type: {data['logical_type']}")
+                validated['logical_type'] = 'ground_fact'  # Default to ground fact
+            logger.debug(f"Inferred logical_type: {validated['logical_type']}")
 
-        if 'polarity' not in data:
+        if 'polarity' not in validated:
             # Default to positive unless we can detect negation
-            data['polarity'] = 'positive'
+            validated['polarity'] = 'positive'
             logger.debug(f"Defaulted polarity to: positive")
 
-        if 'confidence' not in data:
+        if 'confidence' not in validated:
             # Default to medium confidence
-            data['confidence'] = 0.7
+            validated['confidence'] = 0.7
             logger.debug(f"Defaulted confidence to: 0.7")
 
         # Validate logical_type
         valid_types = ['universal_rule', 'existential_claim', 'conditional_logic', 'ground_fact']
-        if data['logical_type'] not in valid_types:
-            raise ValidationError(f"Invalid logical_type: {data['logical_type']}")
+        if validated['logical_type'] not in valid_types:
+            raise ValidationError(f"Invalid logical_type: {validated['logical_type']}")
 
         # Validate polarity
         valid_polarities = ['positive', 'negative']
-        if data['polarity'] not in valid_polarities:
-            raise ValidationError(f"Invalid polarity: {data['polarity']}")
+        if validated['polarity'] not in valid_polarities:
+            raise ValidationError(f"Invalid polarity: {validated['polarity']}")
 
         # Validate confidence
-        confidence = data['confidence']
+        confidence = validated['confidence']
         if not isinstance(confidence, (int, float)) or not (0.0 <= confidence <= 1.0):
             raise ValidationError(f"Invalid confidence: {confidence} (must be 0.0-1.0)")
 
         # Validate subject
-        if not isinstance(data['subject'], dict) or 'name' not in data['subject']:
+        if not isinstance(validated['subject'], dict) or 'name' not in validated['subject']:
             raise ValidationError("Invalid subject structure")
 
         # Validate predicate
-        if not isinstance(data['predicate'], dict) or 'verb' not in data['predicate']:
+        if not isinstance(validated['predicate'], dict) or 'verb' not in validated['predicate']:
             raise ValidationError("Invalid predicate structure")
 
         # Validate object (optional, but if present must have correct structure)
-        if data.get('object') is not None:
-            if not isinstance(data['object'], dict) or 'name' not in data['object']:
+        if validated.get('object') is not None:
+            if not isinstance(validated['object'], dict) or 'name' not in validated['object']:
                 raise ValidationError("Invalid object structure")
+        
+        return validated
 
     def _create_logical_form(
         self,
@@ -462,7 +470,7 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
         texts: List[str],
         context_id: str,
         use_cache: bool = True,
-    ) -> List[LogicalForm]:
+    ) -> "BatchResult":
         """
         Parse multiple statements efficiently.
 
@@ -475,30 +483,40 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
             use_cache: Whether to use cached results
 
         Returns:
-            List of LogicalForm objects
+            BatchResult containing successful LogicalForms and error details (#72)
 
         Example:
             >>> parser = LLMLogicalParser(provider='ollama')
-            >>> texts = [
-            ...     "All employees work remotely",
-            ...     "John is an employee",
-            ...     "Alice is a manager"
-            ... ]
-            >>> forms = parser.parse_batch(texts, "ctx-123")
-            >>> print(f"Parsed {len(forms)} statements")
+            >>> result = parser.parse_batch(["Stmt 1", "Invalid"], "ctx-1")
+            >>> print(f"Parsed {result.success_count} statements")
+            >>> if not result.all_successful:
+            ...     print(f"Failed items: {result.errors}")
         """
-        forms = []
-        for text in texts:
+        # (#72: Full transparency — track successes and errors separately)
+        from glcs.core.models import BatchResult
+        
+        successes = []
+        errors = []
+
+        for i, text in enumerate(texts):
             try:
                 form = self.parse(text, context_id, use_cache=use_cache)
-                forms.append(form)
+                successes.append(form)
             except Exception as e:
-                logger.warning(f"Failed to parse '{text[:50]}...': {e}")
-                # Continue with other statements
-                continue
+                logger.warning(f"Failed to parse batch item {i} ('{text[:30]}...'): {e}")
+                errors.append({
+                    'index': i,
+                    'text': text,
+                    'error': str(e)
+                })
 
-        logger.info(f"Batch parse: {len(forms)}/{len(texts)} successful")
-        return forms
+        logger.info(f"Batch parse: {len(successes)}/{len(texts)} successful")
+        
+        return BatchResult(
+            successes=successes,
+            errors=errors,
+            total_count=len(texts)
+        )
 
     def clear_cache(self) -> int:
         """
@@ -547,14 +565,13 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
             >>> # Try with GPT-4 for better accuracy
             >>> parser.switch_provider('openai', model='gpt-4o')
         """
-        self.provider_name = provider_name
-        # (#12: keep _model/_temperature in sync so cache keys remain correct)
-        self._model = model or self._get_default_model(provider_name)
-        self._temperature = 0.1
+        # (#70: Atomic update — prepare new state first, only apply if creation succeeds)
+        new_model = model or self._get_default_model(provider_name)
+        new_temperature = 0.1
 
         provider_config = {
-            'model': self._model,
-            'temperature': self._temperature,
+            'model': new_model,
+            'temperature': new_temperature,
             'max_tokens': 300,
             'timeout': self.timeout,
         }
@@ -562,8 +579,15 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
         if api_key:
             provider_config['api_key'] = api_key
 
+        # Create new provider instance before changing internal state
         config_obj = ProviderConfig(**provider_config)
-        self.provider = ProviderFactory.create(provider_name, config=config_obj)
+        new_provider = ProviderFactory.create(provider_name, config=config_obj)
+
+        # Successful creation, now apply state changes
+        self.provider = new_provider
+        self.provider_name = provider_name
+        self._model = new_model
+        self._temperature = new_temperature
 
         # Clear cache when switching providers
         self.clear_cache()
