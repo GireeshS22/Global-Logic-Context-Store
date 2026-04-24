@@ -198,7 +198,7 @@ Carried forward from original audit. Tracks which components have been verified.
 | 78 | ~~Gemini model recreated every call~~ | ~~`glcs/providers/gemini_provider.py:99-103`~~ | **FIXED** Implemented caching for `GenerativeModel` instances with system instructions. Re-uses instances when instruction matches. Added unit test. |
 | 79 | ~~History unbounded in `llm_wrapper.py`~~ | ~~`glcs/llm_wrapper.py:95,255,280`~~ | **FIXED** Implemented sliding window for conversation history using `GLCS_MAX_HISTORY` (default 50). Added unit test for history enforcement. |
 | 80 | ~~`load_dotenv()` at import time~~ | ~~`glcs/llm_wrapper.py:23`~~ | **FIXED** Moved `load_dotenv()` from global scope to `GLCSWrapper.__init__` to prevent test environment contamination. |
-| 81 | Logging fallback hides config problems | `glcs/utils/logger.py:126-134` | Missing config file silently falls back to basicConfig. No warning emitted. |
+| 81 | ~~Logging fallback hides config problems~~ | ~~`glcs/utils/logger.py:126-134`~~ | **FIXED** `get_logger()` now emits a clear warning to `stderr` when falling back to default logging due to a missing configuration file. Added unit test. |
 | 82 | ~~No `__repr__` for LogicalForm~~ | ~~`glcs/core/models.py`~~ | **FIXED** Custom `__repr__` implemented for `LogicalForm` that summarizes metadata and hides the massive 768-float embedding array. Added `__str__` for friendly display. |
 | 83 | ~~Mutable default in ProviderConfig~~ | ~~`glcs/providers/base.py:18`~~ | **FIXED** Replaced `extra: Dict = None` with `field(default_factory=dict)`. |
 
@@ -210,11 +210,11 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 57 | 6 |
-| **Total** | **83** | **77** | **6** |
+| Tier 3: Engineering Quality | 63 | 58 | 5 |
+| **Total** | **83** | **78** | **5** |
 
 ---
 
-**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #60, #61, #63, #64, #66–#74, #76–#80, #82, #83 fixed)
+**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #60, #61, #63, #64, #66–#74, #76–#83 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)
 

@@ -150,3 +150,23 @@ def test_log_rotation_config():
     for handler in rotating_handlers:
         assert handler.maxBytes == 10485760
         assert handler.backupCount == 5
+
+def test_logging_fallback_warning(capsys, monkeypatch):
+    """Test that a warning is emitted when falling back to default logging (#81)."""
+    reset_logging()
+    
+    # Mock setup_logging to fail with FileNotFoundError
+    from glcs.utils import logger as logger_module
+    def mock_setup_fail(path=None):
+        raise FileNotFoundError("Mock config not found")
+    
+    monkeypatch.setattr(logger_module, "setup_logging", mock_setup_fail)
+    
+    # Trigger auto-configuration
+    get_logger("test.fallback")
+    
+    # Check stderr for warning
+    captured = capsys.readouterr()
+    assert "WARNING" in captured.err
+    assert "Mock config not found" in captured.err
+    assert "Falling back to default logging" in captured.err
