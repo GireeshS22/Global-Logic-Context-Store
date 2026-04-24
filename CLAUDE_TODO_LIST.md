@@ -161,7 +161,7 @@ Carried forward from original audit. Tracks which components have been verified.
 | 53 | ~~Fake test patterns~~ | **FIXED** Removed empty `except: pass` in `test_provider_system.py`. Validated `assert True` and `assert isinstance(x, object)` were already cleaned up or replaced with meaningful assertions in smoke and parser tests. |
 | 54 | Integration tests mock the LLM | `test_advanced_glcs.py` — every test mocks `_call_llm`. These are unit tests in disguise, not integration tests. |
 | 55 | ~~Stale test assertion~~ | ~~`test_llm_parser.py:59`~~ | **FIXED** Updated assertion: Ollama default model is `qwen2.5:0.5b`. |
-| 56 | Register markers | `requires_api_key` marker is used but not registered in `pytest.ini`. Causes warnings. |
+| 56 | ~~Register markers~~ | ~~`pytest.ini`~~ | **FIXED** Registered `requires_api_key` and `api` markers in `pytest.ini` to eliminate "unknown marker" warnings. |
 | 57 | ~~No `conftest.py`~~ | **FIXED** Created `tests/conftest.py` and moved common fixtures (`memory_manager`, `encoder`, `advanced_glcs`) there. Reduced duplication in 4+ files. |
 
 ### 3.8 Project Packaging
@@ -210,11 +210,11 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 60 | 3 |
-| **Total** | **83** | **80** | **3** |
+| Tier 3: Engineering Quality | 63 | 61 | 2 |
+| **Total** | **83** | **81** | **2** |
 
 ---
 
-**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #60–#67, #69–#74, #76–#83 fixed)
+**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #56, #57, #60–#67, #69–#74, #76–#83 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)
 
