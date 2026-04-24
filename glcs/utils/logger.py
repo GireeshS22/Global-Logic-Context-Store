@@ -124,7 +124,11 @@ def get_logger(name: str, level: Optional[str] = None) -> logging.Logger:
     if not _logging_configured:
         try:
             setup_logging()
-        except FileNotFoundError:
+        except FileNotFoundError as e:
+            # (#81: Emit warning when falling back to basicConfig)
+            import sys
+            print(f"WARNING: {e}. Falling back to default logging.", file=sys.stderr)
+            
             # Fallback to basic configuration if config file not found
             logging.basicConfig(
                 level=logging.INFO,

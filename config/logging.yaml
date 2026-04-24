@@ -33,20 +33,22 @@ handlers:
 
   # File output (JSON format for parsing)
   file:
-    class: logging.FileHandler
+    class: logging.handlers.RotatingFileHandler
     level: INFO
     formatter: json
     filename: glcs.log
-    mode: 'a'
+    maxBytes: 10485760 # 10MB
+    backupCount: 5
     encoding: utf-8
 
   # Error file (only errors and above)
   error_file:
-    class: logging.FileHandler
+    class: logging.handlers.RotatingFileHandler
     level: ERROR
     formatter: detailed
     filename: glcs_errors.log
-    mode: 'a'
+    maxBytes: 10485760 # 10MB
+    backupCount: 5
     encoding: utf-8
 
 # Logger configuration

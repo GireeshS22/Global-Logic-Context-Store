@@ -17,7 +17,8 @@ from glcs.api.models import (
     LogicalFormResponse, ConsistencyReportResponse, SearchResponse,
     ContextsResponse, HealthResponse, ErrorResponse,
     EntityResponse, RelationResponse, ViolationResponse,
-    SearchResult, ContextInfo
+    SearchResult, ContextInfo,
+    BatchParseResponse, BatchError
 )
 from glcs.advanced_wrapper import AdvancedGLCS
 from glcs.core.models import LogicalForm
@@ -173,7 +174,7 @@ def parse_statement(request: ParseRequest):
         )
 
 
-@router.post("/parse/batch", response_model=List[LogicalFormResponse], tags=["Parsing"])
+@router.post("/parse/batch", response_model=BatchParseResponse, tags=["Parsing"])
 def parse_batch(request: BatchParseRequest):
     """
     Parse multiple statements in batch.
@@ -182,7 +183,7 @@ def parse_batch(request: BatchParseRequest):
     - **context_id**: Context identifier for all statements
     - **use_cache**: Whether to use cached results (default: true)
 
-    Returns a list of parsed logical forms.
+    Returns a batch result containing successfully parsed forms and details of any failures.
     """
     try:
         logger.info(f"Batch parsing {len(request.texts)} statements")
@@ -193,26 +194,38 @@ def parse_batch(request: BatchParseRequest):
                 detail="GLCS system not initialized"
             )
 
-        # Parse batch
-        forms = glcs.parser.parse_batch(
+        # Parse batch using core logic (#72)
+        batch_result = glcs.parser.parse_batch(
             request.texts,
             request.context_id,
             use_cache=request.use_cache
         )
 
-        # Add embeddings and store in memory (non-fatal — parse results are still returned on failure)
-        try:
-            glcs.encoder.add_embeddings_to_forms(forms)
-            for form in forms:
-                glcs.memory.store_form(form)
-        except Exception as e:
-            logger.warning(f"Memory storage failed (non-fatal): {e}")
+        # Add embeddings and store successful forms in memory
+        if batch_result.successes:
+            try:
+                glcs.encoder.add_embeddings_to_forms(batch_result.successes)
+                for form in batch_result.successes:
+                    glcs.memory.store_form(form)
+            except Exception as e:
+                logger.warning(f"Memory storage failed for some batch items: {e}")
 
         # Convert to response models
-        responses = [_logical_form_to_response(form) for form in forms]
+        forms_response = [_logical_form_to_response(f) for f in batch_result.successes]
+        errors_response = [
+            BatchError(index=e['index'], text=e['text'], error=e['error']) 
+            for e in batch_result.errors
+        ]
 
-        logger.info(f"Successfully parsed {len(responses)}/{len(request.texts)} statements")
-        return responses
+        logger.info(f"Batch parse complete: {batch_result.success_count}/{batch_result.total_count} successful")
+        
+        return BatchParseResponse(
+            forms=forms_response,
+            errors=errors_response,
+            total_count=batch_result.total_count,
+            success_count=batch_result.success_count,
+            all_successful=batch_result.all_successful
+        )
 
     except Exception as e:
         logger.error(f"Batch parse error: {e}")

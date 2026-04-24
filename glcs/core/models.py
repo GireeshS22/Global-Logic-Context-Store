@@ -20,11 +20,15 @@ JSON serialization.
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Generic, TypeVar
 from uuid import UUID, uuid4
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_serializer, field_validator
+
+
+# Type variable for generic results
+T = TypeVar("T")
 
 
 # ============================================================================
@@ -230,6 +234,20 @@ class LogicalForm(BaseModel):
         validate_assignment=True  # Run validators on field assignment
     )
 
+    def __repr__(self) -> str:
+        """Custom repr to hide massive embedding array in logs."""
+        emb_str = f"np.ndarray(shape={self.embedding.shape})" if self.embedding is not None else "None"
+        return (
+            f"LogicalForm(form_id={self.form_id}, context_id='{self.context_id}', "
+            f"type={self.logical_type.value}, subject='{self.subject.name}', "
+            f"predicate='{self.predicate.verb}', object='{self.object.name if self.object else None}', "
+            f"polarity={self.polarity.value}, embedding={emb_str})"
+        )
+
+    def __str__(self) -> str:
+        """Friendly string representation."""
+        return f"[{self.logical_type.value.upper()}] {self.source_text} ({self.polarity.value})"
+
     @field_validator('embedding', mode='before')
     @classmethod
     def coerce_and_validate_embedding(cls, v: Any) -> Optional[np.ndarray]:
@@ -335,3 +353,35 @@ class ConsistencyReport(BaseModel):
     def is_consistent(self) -> bool:
         """True iff no violations were detected. Auto-derived — never pass manually."""
         return len(self.violations) == 0
+
+
+class BatchResult(BaseModel, Generic[T]):
+    """
+    Generic container for batch operation results (#72, #73).
+    
+    Tracks successful items and failures separately to ensure transparency.
+    Provides full type safety for successes via Generic[T].
+    
+    Attributes:
+        successes: List of successfully processed items of type T
+        errors: List of dicts with 'index', 'text', and 'error' keys
+        total_count: Total number of items in the batch
+    """
+    successes: List[T] = Field(default_factory=list)
+    errors: List[Dict[str, Any]] = Field(default_factory=list)
+    total_count: int = 0
+
+    @computed_field
+    @property
+    def success_count(self) -> int:
+        return len(self.successes)
+
+    @computed_field
+    @property
+    def error_count(self) -> int:
+        return len(self.errors)
+
+    @computed_field
+    @property
+    def all_successful(self) -> bool:
+        return len(self.errors) == 0

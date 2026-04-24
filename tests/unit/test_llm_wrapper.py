@@ -81,3 +81,22 @@ class TestValidateConfig:
         }
         result = validate_config(config)
         assert result is None, "validate_config should return None, not True"
+
+class TestHistorySlidingWindow:
+    """#79 — History must not grow without limit."""
+
+    def test_history_sliding_window_enforcement(self, wrapper):
+        """History should only keep the last max_history items."""
+        wrapper.max_history = 5
+        
+        # Mock consistency check to avoid overhead
+        with patch.object(wrapper, "check_and_store", return_value=(True, [])):
+            # Generate 10 rounds of conversation (20 messages total: 10 user, 10 assistant)
+            for i in range(10):
+                wrapper.generate(f"Prompt {i}", check_consistency=False)
+        
+        # Each generate adds 2 messages (user prompt + assistant response)
+        # With max_history=5, we should only have the last 5 messages.
+        assert len(wrapper.history) == 5
+        assert wrapper.history[-1]["content"] == "Test response"
+        assert wrapper.history[-2]["content"] == "Prompt 9"
