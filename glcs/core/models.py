@@ -20,11 +20,15 @@ JSON serialization.
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Generic, TypeVar
 from uuid import UUID, uuid4
 
 import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_serializer, field_validator
+
+
+# Type variable for generic results
+T = TypeVar("T")
 
 
 # ============================================================================
@@ -351,18 +355,19 @@ class ConsistencyReport(BaseModel):
         return len(self.violations) == 0
 
 
-class BatchResult(BaseModel):
+class BatchResult(BaseModel, Generic[T]):
     """
     Generic container for batch operation results (#72, #73).
     
     Tracks successful items and failures separately to ensure transparency.
+    Provides full type safety for successes via Generic[T].
     
     Attributes:
-        successes: List of successfully processed items
+        successes: List of successfully processed items of type T
         errors: List of dicts with 'index', 'text', and 'error' keys
         total_count: Total number of items in the batch
     """
-    successes: List[Any] = Field(default_factory=list)
+    successes: List[T] = Field(default_factory=list)
     errors: List[Dict[str, Any]] = Field(default_factory=list)
     total_count: int = 0
 

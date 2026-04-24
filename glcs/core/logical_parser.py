@@ -476,7 +476,7 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
         texts: List[str],
         context_id: str,
         use_cache: bool = True,
-    ) -> "BatchResult":
+    ) -> "BatchResult[LogicalForm]":
         """
         Parse multiple statements efficiently.
 

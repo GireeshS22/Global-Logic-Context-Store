@@ -192,7 +192,7 @@ class AdvancedGLCS:
         texts: List[str],
         context_id: str,
         auto_store: bool = True,
-    ) -> "BatchResult":
+    ) -> "BatchResult[ConsistencyReport]":
         """
         Process multiple statements efficiently.
 
