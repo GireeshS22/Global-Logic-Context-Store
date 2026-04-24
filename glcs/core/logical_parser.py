@@ -373,6 +373,12 @@ Now extract from the following statement. Return ONLY the JSON, no additional te
                 validated['logical_type'] = 'ground_fact'  # Default to ground fact
             logger.debug(f"Inferred logical_type: {validated['logical_type']}")
 
+        # (#84: Robustness — auto-correct common hallucinations)
+        raw_type = str(validated['logical_type']).lower()
+        if raw_type in ['negative', 'positive', 'statement', 'fact', 'assertion']:
+            validated['logical_type'] = 'ground_fact'
+            logger.debug(f"Auto-corrected logical_type '{raw_type}' to 'ground_fact'")
+
         if 'polarity' not in validated:
             # Default to positive unless we can detect negation
             validated['polarity'] = 'positive'
