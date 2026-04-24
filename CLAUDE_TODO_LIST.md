@@ -173,7 +173,7 @@ Carried forward from original audit. Tracks which components have been verified.
 | 59 | `authors = ["PhD Project"]` | Not in standard `"Name <email>"` format. Will cause issues during PyPI publication. |
 | 60 | ~~No CLI entry point~~ | ~~`glcs/cli.py`~~ | **FIXED** Created full-featured CLI using `argparse` with support for processing, verifying, searching, and clearing contexts. Added entry point to `pyproject.toml`. |
 | 61 | ~~Log rotation missing~~ | ~~`config/logging.yaml`~~ | **FIXED** Updated `file` and `error_file` handlers to use `RotatingFileHandler` with 10MB limit and 5 backups. Added unit test verification. |
-| 62 | `glcs/hierarchical/` is empty | Empty placeholder subpackage with no modules. Remove or document as future work. |
+| 62 | ~~`glcs/hierarchical/` is empty~~ | ~~`glcs/hierarchical/`~~ | **FIXED** Added `README.md` and package docstring documenting this as a placeholder for Stage 3 hierarchical research. |
 | 63 | ~~Advanced API not exported~~ | ~~`glcs/__init__.py`~~ | **FIXED** `glcs/__init__.py` now exports all key advanced components (`AdvancedGLCS`, `LLMLogicalParser`, `LogicalForm`, etc.) with `__getattr__` lazy loading to prevent eager heavy imports. |
 | 64 | ~~Dual config systems~~ | ~~`glcs/config.py`~~ | **FIXED** Unified into a single system in `glcs/config.py`. `glcs/utils/config_manager.py` now serves as a compatibility bridge. Added validation and env overrides. |
 | 65 | `.env.template` incomplete | Only documents 3 API keys. Missing: `GROQ_API_KEY`, `OLLAMA_ENDPOINT`, `OLLAMA_MODEL`, `GLCS_DEFAULT_PROVIDER`, `GLCS_TEMPERATURE`, `GLCS_MAX_TOKENS`, and all model override vars. |
@@ -210,11 +210,11 @@ Carried forward from original audit. Tracks which components have been verified.
 |------|-------|-------|-----------|
 | Tier 1: Critical | 10 | 10 | 0 |
 | Tier 2: Data Integrity | 10 | 10 | 0 |
-| Tier 3: Engineering Quality | 63 | 58 | 5 |
-| **Total** | **83** | **78** | **5** |
+| Tier 3: Engineering Quality | 63 | 59 | 4 |
+| **Total** | **83** | **79** | **4** |
 
 ---
 
-**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #60, #61, #63, #64, #66–#74, #76–#83 fixed)
+**Last Updated:** 2026-04-21 (Tier 3 — #23, #47–#53, #57, #60–#64, #66–#74, #76–#83 fixed)
 **Audited By:** Claude Opus 4.6 (full codebase audit)
 
