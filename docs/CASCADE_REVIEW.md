@@ -28,9 +28,9 @@ This document is updated after each stage to track cumulative dependencies.
    - No pip/virtualenv/conda
    - **Impact**: All documentation and scripts reference `poetry run`
 
-2. **Python Version: 3.11+**
-   - Required by numpy 2.3.4
-   - **Impact**: Cannot support Python 3.10 or earlier
+2. **Python Version: 3.10+**
+   - Minimum version per pyproject.toml (`python = "^3.10"`)
+   - **Impact**: Cannot support Python 3.9 or earlier
 
 3. **Project Structure**
    ```
