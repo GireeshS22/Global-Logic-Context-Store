@@ -282,7 +282,7 @@ Tests `SemanticEncoder` (sentence-transformers wrapper).
 
 Tests the provider factory and all five LLM provider implementations.
 
-**Providers tested:** OpenAI, Anthropic (Claude), Gemini, Groq, Ollama
+**Providers tested (unit, mocked):** OpenAI, Anthropic (Claude), Gemini, Groq, Ollama, Together AI, xAI
 
 **Areas covered:**
 - `ProviderFactory` registration (idempotent re-registration, duplicate class collision)

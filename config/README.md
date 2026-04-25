@@ -81,13 +81,19 @@ parser:
 
 **Parameters**:
 - `llm_provider`: LLM API provider
-  - `openai` - Currently supported
-  - `anthropic`, `google` - Future support
+  - `openai` — GPT-4o-mini, GPT-4o
+  - `anthropic` / `claude` — Claude Haiku, Sonnet
+  - `gemini` / `google` — Gemini 2.5 Flash, Pro
+  - `groq` — Mixtral, Llama (ultra-fast)
+  - `together` — Open-source models via Together AI
+  - `xai` / `grok` — Grok models from xAI
+  - `ollama` — Local models, no API key needed
 
 - `model`: Specific LLM model
-  - `gpt-4o-mini` - Cheap, fast (recommended for MVP)
-  - `gpt-4o` - Better quality, more expensive
-  - `gpt-4-turbo` - Fast, high quality
+  - `gpt-4o-mini` — Fast, cheap OpenAI model (recommended)
+  - `claude-haiku-4-5-20251001` — Fast, cheap Anthropic model
+  - `gemini-2.5-flash` — Fast, cheap Gemini model
+  - `qwen2.5:0.5b` — Tiny local model for development
 
 - `max_retries`: API failure retries (3 is recommended)
 

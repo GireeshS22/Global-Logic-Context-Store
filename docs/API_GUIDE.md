@@ -24,7 +24,7 @@ poetry run uvicorn glcs.api.app:app --reload
 # 5. Open http://localhost:8000/docs in your browser
 ```
 
-**That's it!** Interactive API docs are now at `/docs` <‰
+**That's it!** Interactive API docs are now at `/docs`ï¿½
 
 ---
 
@@ -112,7 +112,8 @@ poetry run pytest tests/api/ -v
 
 ---
 
-## Complete Guide
+## More Documentation
 
-For full documentation including all endpoints, examples, deployment, and troubleshooting, see the complete API guide at:
-https://github.com/GireeshS22/Global-Logic-Context-Store/blob/develop/docs/API_GUIDE_FULL.md
+- **Swagger UI:** http://localhost:8000/docs (interactive, try endpoints in-browser)
+- **ReDoc:** http://localhost:8000/redoc
+- **OpenAPI JSON:** http://localhost:8000/openapi.json
