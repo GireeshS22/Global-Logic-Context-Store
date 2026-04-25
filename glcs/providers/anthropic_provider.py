@@ -41,7 +41,7 @@ class AnthropicProvider(LLMProvider):
         super().__init__(config)
 
         if not self.config.model:
-            self.config.model = "claude-3-5-sonnet-20241022"
+            self.config.model = "claude-haiku-4-5-20251001"
 
         # Validate config before creating client (#27)
         if not self.config.api_key:

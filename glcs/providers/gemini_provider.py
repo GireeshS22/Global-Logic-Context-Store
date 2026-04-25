@@ -1,11 +1,11 @@
 """
 Google Gemini provider implementation for GLCS.
 
-Supports Gemini 1.5 Pro and Gemini 1.5 Flash.
+Uses the google-genai SDK (google.generativeai is deprecated).
+Supports Gemini 2.0 Flash, Gemini 2.5 Flash, and other current models.
 """
 
 from typing import List, Dict, Any
-from collections import OrderedDict
 from glcs.providers.base import (
     LLMProvider,
     ProviderConfig,
@@ -16,126 +16,79 @@ from glcs.providers.base import (
     ProviderRateLimitError,
 )
 
-# Import typed SDK exceptions for proper error classification (#24)
-try:
-    from google.api_core import exceptions as _google_exceptions
-    _GEMINI_DEADLINE_ERROR = _google_exceptions.DeadlineExceeded
-    _GEMINI_RATE_LIMIT_ERROR = _google_exceptions.ResourceExhausted
-    _GEMINI_API_ERROR = _google_exceptions.GoogleAPICallError
-except (ImportError, AttributeError):
-    _GEMINI_DEADLINE_ERROR = None
-    _GEMINI_RATE_LIMIT_ERROR = None
-    _GEMINI_API_ERROR = None
-
 
 class GeminiProvider(LLMProvider):
-    """Google Gemini LLM provider
+    """Google Gemini LLM provider (google-genai SDK).
 
-    Supports Gemini models including:
-    - gemini-1.5-pro
-    - gemini-1.5-flash
-    - gemini-pro
+    Supports current Gemini models including:
+    - gemini-2.0-flash
+    - gemini-2.5-flash-preview-05-20
+    - gemini-2.5-pro-preview-05-06
     """
 
     def __init__(self, config: ProviderConfig):
         super().__init__(config)
 
         if not self.config.model:
-            self.config.model = "gemini-1.5-flash"
+            self.config.model = "gemini-2.5-flash"
 
-        # Validate config before creating client (#27)
         if not self.config.api_key:
             raise ProviderConfigError(
                 "Google API key is required. Set GOOGLE_API_KEY or pass api_key."
             )
 
         try:
-            import google.generativeai as genai
-            genai.configure(api_key=self.config.api_key)
+            from google import genai
+            self._client = genai.Client(api_key=self.config.api_key)
             self._genai = genai
-            self._client = genai.GenerativeModel(self.config.model)
-            # Cache for models with specific system instructions (#78)
-            self._model_cache: OrderedDict[str, Any] = OrderedDict()
         except ImportError:
             raise ProviderError(
-                "Google Generative AI package not installed. "
-                "Install with: pip install google-generativeai"
+                "google-genai package not installed. "
+                "Install with: pip install google-genai"
             )
 
     def generate(self, messages: List[Dict[str, str]], **kwargs) -> str:
         try:
-            gemini_messages = []
+            from google.genai import types
+
             system_instruction = None
+            contents = []
 
             for msg in messages:
-                if msg['role'] == 'system':
-                    system_instruction = msg['content']
+                if msg["role"] == "system":
+                    system_instruction = msg["content"]
                 else:
-                    role = 'model' if msg['role'] == 'assistant' else 'user'
-                    gemini_messages.append({
-                        'role': role,
-                        'parts': [msg['content']]
-                    })
-
-            generation_config = {
-                'temperature': kwargs.get('temperature', self.config.temperature),
-                'max_output_tokens': kwargs.get('max_tokens', self.config.max_tokens),
-            }
-            if 'top_p' in kwargs:
-                generation_config['top_p'] = kwargs['top_p']
-            if 'top_k' in kwargs:
-                generation_config['top_k'] = kwargs['top_k']
-
-            # Use cached model if system instruction matches (#78)
-            if system_instruction:
-                if system_instruction not in self._model_cache:
-                    # LRU cache cleanup if it grows too large
-                    if len(self._model_cache) >= 10:
-                        # evict oldest entry only (BUILD_PRINCIPLES §1)
-                        self._model_cache.popitem(last=False)
-                    
-                    self._model_cache[system_instruction] = self._genai.GenerativeModel(
-                        self.config.model,
-                        system_instruction=system_instruction
+                    role = "model" if msg["role"] == "assistant" else "user"
+                    contents.append(
+                        types.Content(
+                            role=role,
+                            parts=[types.Part(text=msg["content"])],
+                        )
                     )
-                
-                # Mark as recently used
-                self._model_cache.move_to_end(system_instruction)
-                model = self._model_cache[system_instruction]
-            else:
-                model = self._client
 
-            if len(gemini_messages) > 1:
-                history = gemini_messages[:-1]
-                current_message = gemini_messages[-1]['parts'][0]
-                chat = model.start_chat(history=history)
-                response = chat.send_message(
-                    current_message,
-                    generation_config=generation_config
-                )
-            else:
-                response = model.generate_content(
-                    gemini_messages[0]['parts'][0] if gemini_messages else "",
-                    generation_config=generation_config
-                )
+            config_kwargs: Dict[str, Any] = {
+                "temperature": kwargs.get("temperature", self.config.temperature),
+                "max_output_tokens": kwargs.get("max_tokens", self.config.max_tokens),
+            }
+            if system_instruction:
+                config_kwargs["system_instruction"] = system_instruction
 
+            generate_config = types.GenerateContentConfig(**config_kwargs)
+
+            response = self._client.models.generate_content(
+                model=kwargs.get("model", self.config.model),
+                contents=contents,
+                config=generate_config,
+            )
             return response.text
 
         except ProviderError:
             raise
         except Exception as e:
-            # Typed SDK exceptions (#24)
-            if _GEMINI_DEADLINE_ERROR and isinstance(e, _GEMINI_DEADLINE_ERROR):
-                raise ProviderTimeoutError(f"Gemini request timed out: {e}")
-            if _GEMINI_RATE_LIMIT_ERROR and isinstance(e, _GEMINI_RATE_LIMIT_ERROR):
-                raise ProviderRateLimitError(f"Gemini rate limit exceeded: {e}")
-            if _GEMINI_API_ERROR and isinstance(e, _GEMINI_API_ERROR):
-                raise ProviderAPIError(f"Gemini API error: {e}")
-            # Fallback string matching
             error_msg = str(e).lower()
-            if 'timeout' in error_msg or 'deadline' in error_msg:
+            if "timeout" in error_msg or "deadline" in error_msg:
                 raise ProviderTimeoutError(f"Gemini request timed out: {e}")
-            if 'quota' in error_msg or 'rate limit' in error_msg or '429' in error_msg:
+            if "quota" in error_msg or "rate limit" in error_msg or "429" in error_msg:
                 raise ProviderRateLimitError(f"Gemini rate limit exceeded: {e}")
             raise ProviderAPIError(f"Gemini API error: {e}")
 
@@ -147,15 +100,17 @@ class GeminiProvider(LLMProvider):
 
     def get_model_info(self) -> Dict[str, Any]:
         info = super().get_model_info()
-        info['supports_streaming'] = True
-        info['supports_system_instruction'] = True
-        info['context_window'] = self._get_context_window()
+        info["supports_streaming"] = True
+        info["supports_system_instruction"] = True
+        info["context_window"] = self._get_context_window()
         return info
 
     def _get_context_window(self) -> int:
         context_windows = {
-            'gemini-1.5-pro': 1000000,
-            'gemini-1.5-flash': 1000000,
-            'gemini-pro': 32760,
+            "gemini-2.0-flash": 1048576,
+            "gemini-2.5-flash-preview-05-20": 1048576,
+            "gemini-2.5-pro-preview-05-06": 1048576,
+            "gemini-1.5-pro": 1048576,
+            "gemini-1.5-flash": 1048576,
         }
-        return context_windows.get(self.config.model, 32760)
+        return context_windows.get(self.config.model, 1048576)
