@@ -174,6 +174,31 @@ class ConsistencyReportResponse(BaseModel):
     )
 
 
+class BatchError(BaseModel):
+    """Individual error in a batch operation."""
+    index: int = Field(..., description="Position in the original list")
+    text: str = Field(..., description="Original text that failed")
+    error: str = Field(..., description="Error message")
+
+
+class BatchParseResponse(BaseModel):
+    """Result of a batch parse operation."""
+    forms: List[LogicalFormResponse] = Field(..., description="Successfully parsed forms")
+    errors: List[BatchError] = Field(..., description="Details of items that failed to parse")
+    total_count: int = Field(..., description="Total items submitted")
+    success_count: int = Field(..., description="Number of items successfully parsed")
+    all_successful: bool = Field(..., description="True if no errors occurred")
+
+
+class BatchProcessResponse(BaseModel):
+    """Result of a batch process operation."""
+    reports: List[ConsistencyReportResponse] = Field(..., description="Reports for successful items")
+    errors: List[BatchError] = Field(..., description="Details of items that failed to process")
+    total_count: int = Field(..., description="Total items submitted")
+    success_count: int = Field(..., description="Number of items successfully processed")
+    all_successful: bool = Field(..., description="True if no errors occurred")
+
+
 class SearchResult(BaseModel):
     """Single search result."""
     form: LogicalFormResponse = Field(..., description="The logical form")

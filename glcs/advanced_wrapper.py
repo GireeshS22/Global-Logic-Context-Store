@@ -192,7 +192,7 @@ class AdvancedGLCS:
         texts: List[str],
         context_id: str,
         auto_store: bool = True,
-    ) -> List[ConsistencyReport]:
+    ) -> "BatchResult[ConsistencyReport]":
         """
         Process multiple statements efficiently.
 
@@ -202,22 +202,35 @@ class AdvancedGLCS:
             auto_store: If True, store consistent statements
 
         Returns:
-            List of ConsistencyReport objects
+            BatchResult containing reports for successful items and error details (#73)
         """
+        # (#73: Full transparency — track successes and errors separately)
+        from glcs.core.models import BatchResult
+        
         logger.info(f"Processing batch of {len(texts)} statements")
-        reports = []
+        successes = []
+        errors = []
 
-        for i, text in enumerate(texts, 1):
-            logger.debug(f"Processing {i}/{len(texts)}")
+        for i, text in enumerate(texts):
+            logger.debug(f"Processing item {i+1}/{len(texts)}")
             try:
                 report = self.process_statement(text, context_id, auto_store)
-                reports.append(report)
+                successes.append(report)
             except Exception as e:
-                logger.warning(f"Failed to process statement {i}: {e}")
-                continue
+                logger.warning(f"Failed to process statement {i} ('{text[:30]}...'): {e}")
+                errors.append({
+                    'index': i,
+                    'text': text,
+                    'error': str(e)
+                })
 
-        logger.info(f"Batch processing complete: {len(reports)}/{len(texts)} successful")
-        return reports
+        logger.info(f"Batch processing complete: {len(successes)}/{len(texts)} successful")
+        
+        return BatchResult(
+            successes=successes,
+            errors=errors,
+            total_count=len(texts)
+        )
 
     def verify_context(self, context_id: str) -> ConsistencyReport:
         """
@@ -353,6 +366,60 @@ class AdvancedGLCS:
         logger.info(f"Clearing context: {context_id}")
         count = self.memory.clear_context(context_id)
         logger.info(f"Deleted {count} statements")
+        return count
+
+    def clear_all(self) -> int:
+        """
+        Clear all statements from all contexts in the knowledge base.
+
+        Returns:
+            Total number of statements deleted
+
+        Example:
+            >>> glcs = AdvancedGLCS()
+            >>> deleted = glcs.clear_all()
+            >>> print(f"Knowledge base reset. {deleted} records removed.")
+        """
+        logger.info("Wiping entire knowledge base")
+        count = self.memory.clear_all()
+        logger.info(f"Deleted {count} statements in total")
+        return count
+
+    def save_state(self, file_path: str) -> int:
+        """
+        Save the entire knowledge base state to a portable JSON file.
+
+        Args:
+            file_path: Destination path for the state file
+
+        Returns:
+            Number of statements saved
+
+        Example:
+            >>> glcs.save_state("glcs_backup.json")
+        """
+        logger.info(f"Saving knowledge base state to: {file_path}")
+        count = self.memory.save_state(file_path)
+        logger.info(f"Successfully saved {count} statements")
+        return count
+
+    def load_state(self, file_path: str, clear_existing: bool = True) -> int:
+        """
+        Load knowledge base state from a portable JSON file.
+
+        Args:
+            file_path: Source path of the state file
+            clear_existing: If True, wipes current memory before loading
+
+        Returns:
+            Number of statements loaded
+
+        Example:
+            >>> glcs.load_state("glcs_backup.json")
+        """
+        logger.info(f"Loading knowledge base state from: {file_path}")
+        count = self.memory.load_state(file_path, clear_existing=clear_existing)
+        logger.info(f"Successfully loaded {count} statements")
         return count
 
     def get_system_info(self) -> Dict[str, Any]:

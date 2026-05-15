@@ -77,7 +77,19 @@ class SemanticEncoder:
         """
         self.model_name = model_name
         self.model = self._load_model()
-        self.embedding_dim = self.model.get_sentence_embedding_dimension()
+        self._embedding_dim = self.model.get_sentence_embedding_dimension()
+
+    @property
+    def embedding_dim(self) -> int:
+        """
+        Return the dimension of embeddings produced by the current model.
+
+        Example:
+            >>> encoder = SemanticEncoder()
+            >>> encoder.embedding_dim
+            768
+        """
+        return self._embedding_dim
 
     def _load_model(self) -> SentenceTransformer:
         """

@@ -57,6 +57,21 @@ def _register_providers():
     except ImportError:
         pass  # Ollama not installed
 
+    # Try to import and register Together AI provider
+    try:
+        from glcs.providers.together_provider import TogetherProvider
+        ProviderFactory.register('together', TogetherProvider)
+    except ImportError:
+        pass  # openai package not installed
+
+    # Try to import and register xAI provider
+    try:
+        from glcs.providers.xai_provider import XAIProvider
+        ProviderFactory.register('xai', XAIProvider)
+        ProviderFactory.register('grok', XAIProvider)  # Alias
+    except ImportError:
+        pass  # openai package not installed
+
 
 # Auto-register providers on import
 _register_providers()

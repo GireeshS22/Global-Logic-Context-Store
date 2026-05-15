@@ -112,6 +112,6 @@ poetry run pytest tests/api/ -v
 
 ---
 
-## Complete Guide
+## More Documentation
 
 For the hosted documentation, start with [Quickstart](quickstart.md) and [API Reference](api_reference.md), then return here for endpoint-specific request and response examples.

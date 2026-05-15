@@ -25,7 +25,7 @@ The **LLM-Based Logical Parser** is the research-grade parsing component for GLC
 
 ### Key Features
 
-✅ **Multi-Provider Support**: Works with Ollama (local), OpenAI, Anthropic, Gemini, Groq
+✅ **Multi-Provider Support**: Works with Ollama (local), OpenAI, Anthropic, Gemini, Groq, Together AI, xAI
 ✅ **Complex Sentence Handling**: Understands modifiers, clauses, implicit meanings
 ✅ **Rich Extraction**: Entities, relations, logical types, polarity, confidence
 ✅ **Intelligent Caching**: Reduces API costs and improves speed
@@ -287,21 +287,25 @@ for form in forms:
 ### For Parsing Tasks
 
 | Provider | Model | Speed | Accuracy | Cost | Recommended For |
-|----------|-------|-------|----------|------|-----------------|
-| **Ollama** | llama3.2 | 🟢 Fast | 🟡 Good | 🟢 FREE | Development, testing, offline use |
-| **OpenAI** | gpt-4o-mini | 🟢 Fast | 🟢 Excellent | 🟡 Low | Production, high accuracy needed |
-| **Anthropic** | claude-3-haiku | 🟢 Fast | 🟢 Excellent | 🟡 Medium | Production, nuanced understanding |
-| **Gemini** | gemini-1.5-flash | 🟢 Very Fast | 🟢 Good | 🟢 Very Low | High volume parsing |
-| **Groq** | llama-3.1-70b | 🟢 Fastest | 🟡 Good | 🟡 Low | Speed-critical applications |
+|---|---|---|---|---|---|
+| **Ollama** | llama3.2 | Fast | Good | FREE | Development, testing, offline |
+| **OpenAI** | gpt-4o-mini | Fast | Excellent | Low | Production, high accuracy |
+| **Anthropic** | claude-haiku-4-5 | Fast | Excellent | Low | Safety-critical, nuanced |
+| **Gemini** | gemini-2.5-flash | Very Fast | Good | Very Low | High-volume, budget |
+| **Together AI** | Llama-3.3-70B-Turbo | Fast | Good | Very Low | Open-source preference |
+| **xAI** | grok-3-mini | Fast | Excellent | Low | Reasoning tasks |
+| **Groq** | llama-3.1-70b | Fastest | Good | Low | Speed-critical |
 
 ### Cost Estimates (per 1000 parses)
 
 | Provider | Model | Estimated Cost |
-|----------|-------|----------------|
+|---|---|---|
 | Ollama | llama3.2 | **$0.00** (local) |
-| OpenAI | gpt-4o-mini | ~$0.15 |
-| Anthropic | claude-3-haiku | ~$0.25 |
-| Gemini | gemini-1.5-flash | ~$0.05 |
+| Together AI | Llama-3.3-70B-Turbo | ~$0.03 |
+| Gemini | gemini-2.5-flash | ~$0.04 |
+| Anthropic | claude-haiku-4-5 | ~$0.05 |
+| OpenAI | gpt-4o-mini | ~$0.06 |
+| xAI | grok-3-mini | ~$0.04 |
 | Groq | llama-3.1-70b | ~$0.10 |
 
 ---
@@ -470,7 +474,7 @@ parser = LLMLogicalParser(provider='openai', model='gpt-4o')
 # Clear: "Some employees work remotely" (EXISTENTIAL_CLAIM)
 
 # 2. Switch to higher accuracy model
-parser.switch_provider('anthropic', model='claude-3-5-sonnet-20241022')
+parser.switch_provider('anthropic', model='claude-sonnet-4-6')
 ```
 
 ### Issue 4: Slow Performance

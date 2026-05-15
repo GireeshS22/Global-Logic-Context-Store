@@ -100,10 +100,12 @@ class TestFullPipeline:
             "Charlie is an employee"
         ]
 
-        reports = advanced_glcs.process_batch(statements, "test-ctx-3")
+        result = advanced_glcs.process_batch(statements, "test-ctx-3")
 
-        assert len(reports) == 3
-        assert all(r.is_consistent for r in reports)
+        assert result.success_count == 3
+        assert result.total_count == 3
+        assert result.all_successful is True
+        assert all(r.is_consistent for r in result.successes)
 
         # Verify all stored
         forms = advanced_glcs.memory.get_forms_by_context("test-ctx-3")
@@ -220,6 +222,38 @@ class TestContextManagement:
         # Verify context is empty
         forms = advanced_glcs.memory.get_forms_by_context("test-ctx-7")
         assert len(forms) == 0
+
+    @patch('glcs.core.logical_parser.LLMLogicalParser._call_llm')
+    def test_clear_all(self, mock_call_llm, advanced_glcs):
+        """Test clearing the entire knowledge base."""
+        # Add statements to different contexts
+        mock_call_llm.return_value = {
+            'subject': {'name': 'alice', 'type': 'person'},
+            'predicate': {'verb': 'is', 'type': 'property'},
+            'object': {'name': 'engineer', 'type': 'role'},
+            'logical_type': 'ground_fact',
+            'polarity': 'positive',
+            'confidence': 0.9
+        }
+        advanced_glcs.process_statement("Alice is an engineer", "ctx-1")
+
+        mock_call_llm.return_value = {
+            'subject': {'name': 'bob', 'type': 'person'},
+            'predicate': {'verb': 'is', 'type': 'property'},
+            'object': {'name': 'designer', 'type': 'role'},
+            'logical_type': 'ground_fact',
+            'polarity': 'positive',
+            'confidence': 0.9
+        }
+        advanced_glcs.process_statement("Bob is a designer", "ctx-2")
+
+        assert advanced_glcs.memory.count_all_forms() == 2
+
+        # Clear all
+        count = advanced_glcs.clear_all()
+
+        assert count == 2
+        assert advanced_glcs.memory.count_all_forms() == 0
 
 
 class TestConsistencyChecking:
