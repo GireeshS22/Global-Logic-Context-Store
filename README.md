@@ -4,9 +4,13 @@
 **Status**: Development  
 **License**: MIT
 
+[![Documentation Status](https://readthedocs.org/projects/glcs/badge/?version=latest)](https://glcs.readthedocs.io/en/latest/)
+
 > **A middleware layer that stops LLMs from contradicting themselves.**
 >
-> GLCS intercepts LLM outputs, extracts logical statements, and checks them for consistency against everything the model has said before — in real time, across any provider.
+> GLCS intercepts LLM outputs, extracts logical statements, and checks them for consistency against everything the model has said before - in real time, across any provider.
+
+Hosted documentation: https://glcs.readthedocs.io/
 
 ---
 
@@ -23,7 +27,7 @@ GLCS (Global Logical Context Store) is a neuro-symbolic middleware system for en
 - **LLM-Based Parsing**: Understands complex natural language using any supported provider
 - **Vector Memory**: ChromaDB-powered storage with semantic similarity search (sentence-transformers)
 - **Consistency Checking**: Detects contradictions, redundancies, and logical violations
-- **Multi-Provider Support**: 7 LLM providers — OpenAI, Anthropic, Gemini, Groq, Together AI, xAI (Grok), Ollama
+- **Multi-Provider Support**: 7 LLM providers - OpenAI, Anthropic, Gemini, Groq, Together AI, xAI (Grok), Ollama
 - **REST API**: Production-ready HTTP API for remote integration
 - **Offline Mode**: 100% free local operation with Ollama
 
@@ -53,7 +57,7 @@ poetry install --extras gemini       # Google Gemini
 poetry install --extras groq         # Groq
 poetry install --extras all-providers  # Everything above
 
-# Together AI and xAI use the openai package — included with --extras openai
+# Together AI and xAI use the openai package - included with --extras openai
 
 # 4. Configure API keys
 cp .env.template .env
@@ -143,9 +147,9 @@ poetry run python scripts/smoke_test_providers.py
 
 For each provider with a key in `.env`, this runs three checks and shows the full debug output:
 
-1. **Raw generation** — exact messages sent to the API and response received
-2. **Parse test** — LLM extracts a logical form (subject, predicate, type, polarity)
-3. **Consistency scoring** — LLM rates two contradictory facts; rule-based checker shows `is_consistent`, `confidence` score, violations, and suggestions
+1. **Raw generation** - exact messages sent to the API and response received
+2. **Parse test** - LLM extracts a logical form (subject, predicate, type, polarity)
+3. **Consistency scoring** - LLM rates two contradictory facts; rule-based checker shows `is_consistent`, `confidence` score, violations, and suggestions
 
 Example output:
 ```
@@ -173,22 +177,22 @@ Example output:
 
 ```
 Global-Logic-Context-Store/
-├── glcs/
-│   ├── providers/        # LLM provider adapters (OpenAI, Anthropic, Gemini, Groq, Together, xAI, Ollama)
-│   ├── core/             # Parser, encoder, memory manager, consistency checker
-│   ├── hierarchical/     # Hierarchical logic modules
-│   ├── api/              # FastAPI REST layer
-│   └── utils/            # Config, logging, exceptions
-├── scripts/
-│   └── smoke_test_providers.py  # Multi-provider end-to-end test
-├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── fixtures/
-├── examples/
-├── config/               # YAML configuration
-├── docs/                 # Guides
-└── .env.template         # API key reference
+|- glcs/
+|  |- providers/        # LLM provider adapters (OpenAI, Anthropic, Gemini, Groq, Together, xAI, Ollama)
+|  |- core/             # Parser, encoder, memory manager, consistency checker
+|  |- hierarchical/     # Hierarchical logic modules
+|  |- api/              # FastAPI REST layer
+|  `- utils/            # Config, logging, exceptions
+|- scripts/
+|  `- smoke_test_providers.py  # Multi-provider end-to-end test
+|- tests/
+|  |- unit/
+|  |- integration/
+|  `- fixtures/
+|- examples/
+|- config/               # YAML configuration
+|- docs/                 # Guides
+`- .env.template         # API key reference
 ```
 
 ---
@@ -231,11 +235,11 @@ Full config reference: [config/README.md](config/README.md)
 
 ## Documentation
 
-- [Provider Guide](docs/PROVIDER_GUIDE.md) — per-provider comparison and setup
-- [LLM Parser Guide](docs/LLM_PARSER_GUIDE.md) — how parsing works
-- [Ollama Setup](docs/OLLAMA_SETUP.md) — free local LLM setup
-- [API Guide](docs/API_GUIDE.md) — REST API reference
-- [Build Principles](docs/BUILD_PRINCIPLES.md) — engineering standards
+- [Provider Guide](docs/PROVIDER_GUIDE.md) - per-provider comparison and setup
+- [LLM Parser Guide](docs/LLM_PARSER_GUIDE.md) - how parsing works
+- [Ollama Setup](docs/OLLAMA_SETUP.md) - free local LLM setup
+- [API Guide](docs/API_GUIDE.md) - REST API reference
+- [Build Principles](docs/BUILD_PRINCIPLES.md) - engineering standards
 
 ---
 
@@ -252,7 +256,7 @@ This project is part of PhD research on logical consistency in LLMs.
 
 ## License
 
-MIT License — see LICENSE file for details.
+MIT License - see LICENSE file for details.
 
 ## Contributing
 

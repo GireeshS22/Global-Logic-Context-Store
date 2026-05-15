@@ -1,94 +1,64 @@
 # GLCS Documentation
 
+Welcome to the hosted documentation for GLCS. This page gives you the big picture, and the sidebar guides take you into setup, API usage, provider selection, and implementation details.
+
 > **A middleware layer that stops LLMs from contradicting themselves.**
 
-GLCS (Global Logical Context Store) sits between your application and any LLM. Every statement the model makes gets parsed into a logical form, stored in a vector memory, and checked for consistency against everything it has said before. If it contradicts itself — GLCS catches it, scores the conflict, and flags it before it reaches the user.
+GLCS (Global Logical Context Store) sits between your application and any LLM. Every statement the model makes gets parsed into a logical form, stored in vector memory, and checked for consistency against everything it has said before. If it contradicts itself, GLCS catches it before it reaches the user.
 
 ---
 
 ## What it does
 
-1. **Parse** — natural language in, structured logical form out (subject, predicate, object, type, polarity)
-2. **Store** — every statement is embedded (768-dim vectors via sentence-transformers) and saved to ChromaDB
-3. **Check** — new statements are compared against stored ones for contradictions, redundancies, and rule violations
-4. **Report** — a `ConsistencyReport` with severity scores and explanations is returned in real time
+1. **Parse** - natural language in, structured logical form out
+2. **Store** - every statement is embedded and saved to ChromaDB
+3. **Check** - new statements are compared against stored ones for contradictions and redundancies
+4. **Report** - a `ConsistencyReport` is returned with confidence, severity, and explanations
 
-It works with **7 LLM providers** out of the box: OpenAI, Anthropic, Gemini, Groq, Together AI, xAI (Grok), and Ollama (free local).
-
----
-
-## Current Status
-
-**Version:** 0.1.0 — core pipeline complete, REST API live, publishing to PyPI in progress.
-
-| Component | Status |
-|---|---|
-| Data models (LogicalForm, Violation, ConsistencyReport) | Complete |
-| Semantic encoder (768-dim embeddings) | Complete |
-| Vector memory (ChromaDB) | Complete |
-| Consistency checker | Complete |
-| LLM logical parser (all 7 providers) | Complete |
-| REST API (FastAPI) | Complete |
-| PyPI packaging | In progress |
+It works with **7 LLM providers** out of the box: OpenAI, Anthropic, Gemini, Groq, Together AI, xAI (Grok), and Ollama.
 
 ---
 
-## Guides
+## Start Here
 
-| Guide | What it covers |
-|---|---|
-| [Provider Guide](PROVIDER_GUIDE.md) | All 7 providers — setup, pricing, when to use each |
-| [LLM Parser Guide](LLM_PARSER_GUIDE.md) | How parsing works, usage examples, API reference |
-| [REST API Guide](API_GUIDE.md) | HTTP endpoints, curl examples, Python client |
-| [Ollama Setup](OLLAMA_SETUP.md) | Free local LLM — install, models, troubleshooting |
-| [Build Principles](BUILD_PRINCIPLES.md) | Engineering standards all contributors must follow |
+- [Quickstart](quickstart.md) - install, initialize, parse, and check consistency
+- [API Reference](api_reference.md) - public Python modules and exports
+- [Provider Guide](PROVIDER_GUIDE.md) - provider setup and comparison
+- [Ollama Setup](OLLAMA_SETUP.md) - local offline setup
+- [REST API Guide](API_GUIDE.md) - HTTP endpoints and examples
+- [LLM Parser Guide](LLM_PARSER_GUIDE.md) - advanced parsing workflow
 
----
+## Project Docs
 
-## Quick Start
+- [Build Principles](BUILD_PRINCIPLES.md) - repository conventions and engineering standards
+- [Cascade Review](CASCADE_REVIEW.md) - dependency impact notes for internal changes
+- [Cascade Review Stage 1.5](CASCADE_REVIEW_STAGE1.5.md) - implementation review notes
 
-```bash
-pip install glcs[openai]   # or: [anthropic] [gemini] [groq] [all-providers]
-cp .env.template .env      # add your API key
+## Read This First
+
+This site documents the current public API surface of GLCS.
+
+- Stable imports are available from the top-level `glcs` package.
+- Advanced LLM and REST modules are public, but may still evolve between releases.
+- Examples in these guides are aligned with the current package version and route prefixes.
+
+## Documentation Map
+
+```{toctree}
+:maxdepth: 2
+:caption: Guides
+
+quickstart
+api_reference
+PROVIDER_GUIDE
+OLLAMA_SETUP
+API_GUIDE
+LLM_PARSER_GUIDE
+BUILD_PRINCIPLES
+CASCADE_REVIEW
+CASCADE_REVIEW_STAGE1.5
 ```
 
-```python
-from glcs.advanced_wrapper import AdvancedGLCS
+## Navigation
 
-glcs = AdvancedGLCS(parser_provider='openai')
-
-# First statement — stored fine
-report = glcs.process_statement("All employees must complete training", context_id="hr")
-
-# Second statement — contradiction caught
-report = glcs.process_statement("Bob does not need training", context_id="hr")
-
-if not report.is_consistent:
-    for v in report.violations:
-        print(f"{v.severity}: {v.explanation}")
-```
-
-Or run the REST API:
-
-```bash
-poetry run uvicorn glcs.api.app:app --reload
-# Interactive docs at http://localhost:8000/docs
-```
-
----
-
-## Testing providers
-
-Before deploying, verify all configured providers work end-to-end:
-
-```bash
-poetry run python scripts/smoke_test_providers.py
-```
-
-Shows exact messages sent, responses received, and consistency scores for each provider.
-
----
-
-## Repository
-
-[https://github.com/GireeshS22/Global-Logic-Context-Store](https://github.com/GireeshS22/Global-Logic-Context-Store)
+Use the Sphinx sidebar to browse the guides and API reference. The same content is available at the hosted docs URL once the Read the Docs project is connected.
