@@ -409,6 +409,32 @@ class TestLogicalForm:
         assert data["logical_type"] == "universal_rule"
         assert data["confidence_score"] == 0.95
 
+    def test_logical_form_repr_and_str(self):
+        """Test custom string representations of LogicalForm (#82)."""
+        embedding = np.zeros(768)
+        form = LogicalForm(
+            context_id="test-session",
+            logical_type=LogicalType.GROUND_FACT,
+            subject=Entity(name="Socrates"),
+            predicate=Relation(verb="is"),
+            object=Entity(name="mortal"),
+            polarity=Polarity.POSITIVE,
+            source_text="Socrates is mortal",
+            embedding=embedding
+        )
+        
+        # Test __repr__ (should NOT contain the raw array elements)
+        rep = repr(form)
+        assert "LogicalForm" in rep
+        assert "test-session" in rep
+        assert "np.ndarray(shape=(768,))" in rep
+        # Ensure it doesn't have the string representation of 768 zeros
+        assert "0. 0. 0." not in rep
+        
+        # Test __str__
+        s = str(form)
+        assert "[GROUND_FACT] Socrates is mortal (positive)" in s
+
 
 # ============================================================================
 # VIOLATION MODEL TESTS

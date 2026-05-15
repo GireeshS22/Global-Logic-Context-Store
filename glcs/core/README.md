@@ -1359,12 +1359,12 @@ def resolve_conflicts(report, memory):
 
 ---
 
-## Next Steps
+## Completed Pipeline
 
-After Stages 1.1-1.3, the following components will be built:
+All stages are implemented and tested:
 
-- **Stage 1.4:** Logical Parser (creates LogicalForm objects from natural language)
-- **Stage 1.5:** API Layer (REST endpoints for GLCS operations)
+- **Stage 1.4:** LLM Logical Parser — converts natural language to LogicalForm objects, supports 7 providers (OpenAI, Anthropic, Gemini, Groq, Together AI, xAI, Ollama)
+- **Stage 2.1:** REST API — FastAPI layer exposing `/parse`, `/check`, `/search`, `/contexts` endpoints
 
 ---
 
@@ -1378,9 +1378,11 @@ After Stages 1.1-1.3, the following components will be built:
 
 ---
 
-**Last Updated**: Stage 1.3 (Consistency Checker Complete)
-**Test Coverage**: 88% overall (165 tests, all passing)
-**Stage 0.3**: Data Models - 99% coverage (42 tests)
-**Stage 1.1**: Semantic Encoder - 97% coverage (32 tests)
-**Stage 1.2**: Memory Manager - 84% coverage (29 tests)
-**Stage 1.3**: Consistency Checker - 86% coverage (18 tests)
+**Last Updated**: Stage 2.1 (Full pipeline complete — parser, REST API, 7 providers)
+**Test Coverage**: 88% overall (234 unit tests, all passing)
+**Stage 0.3**: Data Models - 99% coverage
+**Stage 1.1**: Semantic Encoder - 97% coverage
+**Stage 1.2**: Memory Manager - 84% coverage
+**Stage 1.3**: Consistency Checker - 86% coverage
+**Stage 1.4**: LLM Parser - covered (mocked LLM calls)
+**Stage 2.1**: REST API - covered

@@ -170,12 +170,17 @@ def demo_batch_processing():
     ]
 
     print(f"\n📦 Batch parsing {len(statements)} statements...")
-    forms = parser.parse_batch(statements, context_id="team-kb")
+    result = parser.parse_batch(statements, context_id="team-kb")
 
-    print(f"\n✓ Successfully parsed {len(forms)}/{len(statements)} statements")
-    for i, form in enumerate(forms, 1):
+    print(f"\n📊 Results: {result.success_count}/{result.total_count} successful")
+    for i, form in enumerate(result.successes, 1):
         print(f"\n{i}. {form.source_text}")
         print(f"   → {form.logical_type.value} (confidence: {form.confidence_score:.2f})")
+    
+    if not result.all_successful:
+        print(f"\n⚠️  {result.error_count} failures:")
+        for err in result.errors:
+            print(f"   - {err['text']}: {err['error']}")
 
 
 def demo_provider_comparison():

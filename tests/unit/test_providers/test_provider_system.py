@@ -211,6 +211,70 @@ class TestGeminiProvider:
         except (ImportError, ProviderError):
             pytest.skip("Google Generative AI not installed")
 
+    def test_gemini_model_caching(self):
+        """Test that Gemini provider caches model instances (#78)"""
+        try:
+            from glcs.providers.gemini_provider import GeminiProvider
+            with patch('google.generativeai.GenerativeModel') as mock_model_class:
+                mock_model_instance = mock_model_class.return_value
+                mock_model_instance.generate_content.return_value = MagicMock(text="Response")
+                
+                config = ProviderConfig(api_key="test-key", model="gemini-1.5-flash")
+                provider = GeminiProvider(config)
+                
+                messages = [
+                    {"role": "system", "content": "You are a helpful assistant"},
+                    {"role": "user", "content": "Hello"}
+                ]
+                
+                # First call
+                provider.generate(messages)
+                # Second call with same system instruction
+                provider.generate(messages)
+                
+                # Should have created the system-instruction model exactly once
+                # (Plus once in __init__ for the base client)
+                assert mock_model_class.call_count == 2
+                
+                # Third call with different instruction
+                messages2 = [{"role": "system", "content": "New prompt"}, {"role": "user", "content": "Hi"}]
+                provider.generate(messages2)
+                assert mock_model_class.call_count == 3
+                
+        except (ImportError, ProviderError):
+            pytest.skip("Google Generative AI not installed")
+
+    def test_gemini_cache_eviction(self):
+        """Test that Gemini provider evicts oldest entry when cache limit reached."""
+        try:
+            from glcs.providers.gemini_provider import GeminiProvider
+            with patch('google.generativeai.GenerativeModel') as mock_model_class:
+                mock_model_instance = mock_model_class.return_value
+                mock_model_instance.generate_content.return_value = MagicMock(text="Response")
+                
+                config = ProviderConfig(api_key="test-key", model="gemini-1.5-flash")
+                provider = GeminiProvider(config)
+                
+                # Fill cache to limit (10 entries)
+                for i in range(10):
+                    messages = [{"role": "system", "content": f"Prompt {i}"}, {"role": "user", "content": "Hi"}]
+                    provider.generate(messages)
+                
+                assert len(provider._model_cache) == 10
+                assert "Prompt 0" in provider._model_cache
+                
+                # Add 11th entry - should evict Prompt 0
+                messages = [{"role": "system", "content": "Prompt 10"}, {"role": "user", "content": "Hi"}]
+                provider.generate(messages)
+                
+                assert len(provider._model_cache) == 10
+                assert "Prompt 0" not in provider._model_cache
+                assert "Prompt 10" in provider._model_cache
+                assert "Prompt 1" in provider._model_cache
+                
+        except (ImportError, ProviderError):
+            pytest.skip("Google Generative AI not installed")
+
 
 @pytest.mark.requires_api_key
 class TestGroqProvider:
@@ -285,41 +349,72 @@ class TestProviderIntegration:
         providers = ProviderFactory.list_providers()
         assert len(providers) > 0
 
-    def test_provider_factory_with_real_providers(self):
-        """Test factory can create real providers"""
-        from glcs.providers import ProviderFactory
+    def test_create_provider(self):
+        """Test creating a provider via factory"""
+        from glcs.providers import ProviderFactory, ProviderConfig
 
         # Try to create OpenAI provider if available
         if ProviderFactory.is_registered('openai'):
-            config = ProviderConfig(api_key="test-key", model="gpt-4o-mini")
             try:
+                import openai
+                config = ProviderConfig(api_key="test-key", model="gpt-4o-mini")
                 provider = ProviderFactory.create('openai', config=config)
                 assert provider.get_provider_name() == "openai"
-            except Exception:
-                # Expected if OpenAI package not installed
-                pass
+            except ImportError:
+                pytest.skip("openai package not installed")
+            except Exception as e:
+                pytest.fail(f"Failed to create openai provider: {e}")
+
 
     def test_multiple_providers_coexist(self):
         """Test multiple providers can coexist"""
-        from glcs.providers import ProviderFactory
+        from glcs.providers import ProviderFactory, ProviderConfig
+        import importlib
 
         providers = ProviderFactory.list_providers()
+        assert len(providers) >= 1
 
         # Create all available providers
         for provider_name in providers:
-            try:
-                config = ProviderConfig(api_key="test-key", model="test-model")
-                if provider_name == 'ollama':
-                    config.extra = {'endpoint': 'http://localhost:11434'}
+            config = ProviderConfig(api_key="test-key", model="test-model")
+            if provider_name == 'ollama':
+                config.extra = {'endpoint': 'http://localhost:11434'}
 
-                # Just check creation doesn't crash
-                # (actual functionality requires API keys/Ollama running)
+            # Check if dependencies are installed before trying to create
+            if provider_name == 'openai':
                 try:
-                    provider = ProviderFactory.create(provider_name, config=config)
-                    assert provider is not None
-                except (ProviderError, ProviderConfigError, ImportError):
-                    # Expected if dependencies not installed or service not running
-                    pass
-            except (ProviderError, ProviderConfigError, ImportError):
-                # Skip providers that can't be created
-                pass
+                    importlib.import_module('openai')
+                except ImportError:
+                    continue
+            elif provider_name == 'anthropic':
+                try:
+                    importlib.import_module('anthropic')
+                except ImportError:
+                    continue
+            elif provider_name == 'gemini':
+                try:
+                    importlib.import_module('google.generativeai')
+                except ImportError:
+                    continue
+            elif provider_name == 'groq':
+                try:
+                    importlib.import_module('groq')
+                except ImportError:
+                    continue
+
+            try:
+                provider = ProviderFactory.create(provider_name, config=config)
+                assert provider is not None
+                
+                # Normalize provider name for comparison (handle aliases)
+                actual_name = provider.get_provider_name()
+                if provider_name in ['anthropic', 'claude']:
+                    assert actual_name == 'anthropic'
+                elif provider_name in ['gemini', 'google']:
+                    assert actual_name == 'gemini'
+                else:
+                    assert actual_name == provider_name
+            except (ProviderError, ProviderConfigError, ImportError) as e:
+                # Log and skip if it's a known environment issue
+                print(f"Skipping provider {provider_name} due to environment/config: {e}")
+                continue

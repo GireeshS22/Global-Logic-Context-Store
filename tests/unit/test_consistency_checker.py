@@ -15,14 +15,12 @@ Test Coverage:
 """
 
 import time
+import uuid
 
 import numpy as np
 import pytest
-import uuid
 
 from glcs.core.consistency_checker import ConsistencyChecker
-from glcs.core.memory_manager import MemoryManager
-from glcs.core.semantic_encoder import SemanticEncoder
 from glcs.core.models import (
     LogicalForm,
     Entity,
@@ -39,20 +37,6 @@ from glcs.utils.exceptions import ConsistencyError
 # ============================================================================
 # FIXTURES
 # ============================================================================
-
-@pytest.fixture
-def memory_manager():
-    """Provide an in-memory MemoryManager for each test."""
-    collection_name = f"test_{uuid.uuid4().hex[:8]}"
-    return MemoryManager(collection_name=collection_name, in_memory=True)
-
-
-@pytest.fixture
-def encoder():
-    """Provide a SemanticEncoder for adding embeddings."""
-    SemanticEncoder.clear_model_cache()
-    return SemanticEncoder()
-
 
 @pytest.fixture
 def consistency_checker(memory_manager, encoder):
@@ -408,6 +392,64 @@ def test_detect_semantic_redundancy(consistency_checker, encoder, memory_manager
 
     assert len(redundancies) > 0
     assert all(v.severity == "LOW" for v in redundancies)
+
+
+def test_same_text_different_polarity_not_redundant(consistency_checker, encoder):
+    """Regression test for #76: same text with diff polarity should NOT be redundant."""
+    form1 = LogicalForm(
+        context_id="test",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="socrates"),
+        predicate=Relation(verb="is"),
+        object=Entity(name="mortal"),
+        polarity=Polarity.POSITIVE,
+        source_text="Socrates is mortal"
+    )
+
+    form2 = LogicalForm(
+        context_id="test",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="socrates"),
+        predicate=Relation(verb="is"),
+        object=Entity(name="mortal"),
+        polarity=Polarity.NEGATIVE,
+        source_text="Socrates is mortal" # Same text, different polarity
+    )
+
+    encoder.add_embeddings_to_forms([form1, form2])
+    
+    violation = consistency_checker._check_redundancy(form1, form2)
+    assert violation is None, "Should NOT be redundant if polarity differs"
+
+
+def test_batch_same_text_different_polarity_not_redundant(consistency_checker, encoder):
+    """Regression test for #76: batch check should ignore diff polarity same text."""
+    form1 = LogicalForm(
+        context_id="test",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="socrates"),
+        predicate=Relation(verb="is"),
+        object=Entity(name="mortal"),
+        polarity=Polarity.POSITIVE,
+        source_text="Socrates is mortal"
+    )
+
+    form2 = LogicalForm(
+        context_id="test",
+        logical_type=LogicalType.GROUND_FACT,
+        subject=Entity(name="socrates"),
+        predicate=Relation(verb="is"),
+        object=Entity(name="mortal"),
+        polarity=Polarity.NEGATIVE,
+        source_text="Socrates is mortal"
+    )
+
+    encoder.add_embeddings_to_forms([form1, form2])
+    
+    violations = consistency_checker._check_redundancies([form1, form2])
+    
+    redundancies = [v for v in violations if "REDUNDANCY" in v.violation_type]
+    assert len(redundancies) == 0, "Batch check should find 0 redundancies when polarity differs"
 
 
 # ============================================================================
@@ -830,3 +872,45 @@ def test_vectorised_batch_polarity_performance(consistency_checker):
         f"_check_polarity_contradictions took {elapsed:.2f}s for 200 forms — "
         "vectorised implementation should be well under 5 s"
     )
+
+
+def test_optimized_universal_ground_performance(consistency_checker):
+    """_check_universal_ground_contradictions must be efficient for many rules/facts.
+    
+    500 forms (50 rules, 450 facts) with 50 distinct relations.
+    Old O(n^2) logic: 50 * 450 = 22,500 full comparisons.
+    Optimized logic: Groups by relation, significantly fewer comparisons.
+    """
+    forms = []
+    # 50 universal rules — exactly one per relation
+    for i in range(50):
+        rel_idx = i
+        forms.append(LogicalForm(
+            context_id="perf_ug",
+            logical_type=LogicalType.UNIVERSAL_RULE,
+            subject=Entity(name=f"class_{rel_idx}"),
+            predicate=Relation(verb=f"verb_{rel_idx}"),
+            object=Entity(name=f"object_{rel_idx}"),
+            polarity=Polarity.POSITIVE,
+            source_text=f"Rule {i}",
+        ))
+        
+    # 450 ground facts spread across same 50 relations
+    for i in range(450):
+        rel_idx = i % 50
+        forms.append(LogicalForm(
+            context_id="perf_ug",
+            logical_type=LogicalType.GROUND_FACT,
+            subject=Entity(name=f"entity_{i}", entity_type=f"class_{rel_idx}"),
+            predicate=Relation(verb=f"verb_{rel_idx}"),
+            object=Entity(name=f"object_{rel_idx}"),
+            polarity=Polarity.NEGATIVE,
+            source_text=f"Fact {i}",
+        ))
+
+    start = time.perf_counter()
+    violations = consistency_checker._check_universal_ground_contradictions(forms)
+    elapsed = time.perf_counter() - start
+
+    assert len(violations) == 450  # Every fact contradicts its class rule
+    assert elapsed < 1.0, f"Universal-ground check took {elapsed:.2f}s — should be < 1s"

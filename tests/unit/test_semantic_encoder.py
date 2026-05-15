@@ -32,14 +32,6 @@ from glcs.core.models import (
 # ============================================================================
 
 @pytest.fixture
-def encoder():
-    """Provide a fresh SemanticEncoder instance for each test."""
-    # Clear cache to ensure clean state
-    SemanticEncoder.clear_model_cache()
-    return SemanticEncoder()
-
-
-@pytest.fixture
 def sample_texts():
     """Sample texts for testing encoding."""
     return [
@@ -51,20 +43,6 @@ def sample_texts():
     ]
 
 
-@pytest.fixture
-def sample_logical_form():
-    """Sample LogicalForm without embedding."""
-    return LogicalForm(
-        context_id="test_session",
-        logical_type=LogicalType.UNIVERSAL_RULE,
-        subject=Entity(name="humans"),
-        predicate=Relation(verb="are"),
-        object=Entity(name="mortal"),
-        polarity=Polarity.POSITIVE,
-        source_text="All humans are mortal"
-    )
-
-
 # ============================================================================
 # BASIC ENCODING TESTS
 # ============================================================================
@@ -74,6 +52,14 @@ def test_encoder_initialization():
     encoder = SemanticEncoder()
     assert encoder.model_name == "all-mpnet-base-v2"
     assert encoder.model is not None
+    assert encoder.embedding_dim == 768
+
+
+def test_encoder_embedding_dim_property():
+    """Test that embedding_dim property returns correct dimension."""
+    encoder = SemanticEncoder()
+    assert isinstance(encoder.embedding_dim, int)
+    assert encoder.embedding_dim == 768
 
 
 def test_encoder_custom_model():
@@ -89,7 +75,7 @@ def test_encode_single_text(encoder):
 
     # Check type and shape
     assert isinstance(embedding, np.ndarray)
-    assert embedding.shape == (768,)
+    assert embedding.shape == (encoder.embedding_dim,)
     assert embedding.dtype == np.float32
 
 
@@ -129,8 +115,8 @@ def test_encode_without_normalization(encoder):
     """Test encoding without normalization."""
     embedding = encoder.encode("Test text", normalize=False)
 
-    # Should still be 768 dimensions
-    assert embedding.shape == (768,)
+    # Should still be correct dimensions
+    assert embedding.shape == (encoder.embedding_dim,)
 
     # But norm may not be 1.0
     norm = np.linalg.norm(embedding)
@@ -149,11 +135,12 @@ def test_encode_batch(encoder, sample_texts):
     # Check we got the right number of embeddings
     assert len(embeddings) == len(sample_texts)
 
-    # Check each embedding has correct shape
+    # Check each embedding
     for emb in embeddings:
         assert isinstance(emb, np.ndarray)
-        assert emb.shape == (768,)
+        assert emb.shape == (encoder.embedding_dim,)
         assert emb.dtype == np.float32
+
 
 
 def test_encode_batch_produces_same_results_as_single(encoder):
@@ -483,21 +470,21 @@ def test_full_workflow_integration(encoder):
 # DIMENSION VALIDATION TESTS
 # ============================================================================
 
-def test_embedding_dimension_exactly_768(encoder):
-    """Test that all embeddings are exactly 768 dimensions."""
+def test_embedding_dimension_matches_property(encoder):
+    """Test that all embeddings match the embedding_dim property."""
     texts = ["Short", "A longer text string", "An even longer text string with more words"]
 
     for text in texts:
         embedding = encoder.encode(text)
-        assert embedding.shape == (768,), f"Expected (768,), got {embedding.shape}"
+        assert embedding.shape == (encoder.embedding_dim,), f"Expected ({encoder.embedding_dim},), got {embedding.shape}"
 
 
-def test_batch_embedding_dimensions_all_768(encoder, sample_texts):
-    """Test that batch encoding produces all 768-dim embeddings."""
+def test_batch_embedding_dimensions_match_property(encoder, sample_texts):
+    """Test that batch encoding produces embeddings matching embedding_dim."""
     embeddings = encoder.encode_batch(sample_texts)
 
     for i, emb in enumerate(embeddings):
-        assert emb.shape == (768,), f"Embedding {i} has shape {emb.shape}, expected (768,)"
+        assert emb.shape == (encoder.embedding_dim,), f"Embedding {i} has shape {emb.shape}, expected ({encoder.embedding_dim},)"
 
 
 # ============================================================================

@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from glcs.core.models import (
         Entity, Relation, LogicalType, Polarity,
         ViolationType, Severity,
-        LogicalForm, Violation, ConsistencyReport,
+        LogicalForm, Violation, ConsistencyReport, BatchResult
     )
     from glcs.core.semantic_encoder import SemanticEncoder
     from glcs.core.memory_manager import MemoryManager
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
 _MODEL_NAMES = frozenset({
     'Entity', 'Relation', 'LogicalType', 'Polarity',
     'ViolationType', 'Severity',
-    'LogicalForm', 'Violation', 'ConsistencyReport',
+    'LogicalForm', 'Violation', 'ConsistencyReport', 'BatchResult',
 })
 
 _COMPONENT_MAP = {
@@ -74,6 +74,7 @@ __all__ = [
     'LogicalForm',
     'Violation',
     'ConsistencyReport',
+    'BatchResult',
     # Core Components
     'SemanticEncoder',
     'MemoryManager',

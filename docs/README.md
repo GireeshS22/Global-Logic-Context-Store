@@ -1,6 +1,23 @@
 # GLCS Documentation
 
-Welcome to the hosted documentation for GLCS. Start here if you installed the package with `pip install glcs` and want a stable reference for the Python API, quickstart flow, provider setup, and REST endpoints.
+Welcome to the hosted documentation for GLCS. This page gives you the big picture, and the sidebar guides take you into setup, API usage, provider selection, and implementation details.
+
+> **A middleware layer that stops LLMs from contradicting themselves.**
+
+GLCS (Global Logical Context Store) sits between your application and any LLM. Every statement the model makes gets parsed into a logical form, stored in vector memory, and checked for consistency against everything it has said before. If it contradicts itself, GLCS catches it before it reaches the user.
+
+---
+
+## What it does
+
+1. **Parse** - natural language in, structured logical form out
+2. **Store** - every statement is embedded and saved to ChromaDB
+3. **Check** - new statements are compared against stored ones for contradictions and redundancies
+4. **Report** - a `ConsistencyReport` is returned with confidence, severity, and explanations
+
+It works with **7 LLM providers** out of the box: OpenAI, Anthropic, Gemini, Groq, Together AI, xAI (Grok), and Ollama.
+
+---
 
 ## Start Here
 
@@ -21,9 +38,9 @@ Welcome to the hosted documentation for GLCS. Start here if you installed the pa
 
 This site documents the current public API surface of GLCS.
 
-- The simple, stable imports are available from the top-level `glcs` package.
-- The advanced LLM and REST modules are documented here as public APIs, but they may still evolve between releases.
-- Examples in the guides are aligned with the current package version and the current REST API route prefixes.
+- Stable imports are available from the top-level `glcs` package.
+- Advanced LLM and REST modules are public, but may still evolve between releases.
+- Examples in these guides are aligned with the current package version and route prefixes.
 
 ## Documentation Map
 
